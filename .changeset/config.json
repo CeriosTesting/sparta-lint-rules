@@ -1,7 +1,7 @@
 {
 	"$schema": "../node_modules/@changesets/config/schema.json",
 	"changelog": "@changesets/cli/changelog",
-	"commit": true,
+	"commit": false,
 	"fixed": [],
 	"linked": [],
 	"access": "public",
