@@ -1,0 +1,9 @@
+{
+	"files.eol": "\n",
+	"files.trimTrailingWhitespace": true,
+	"js/ts.preferences.importModuleSpecifier": "non-relative",
+	"editor.defaultFormatter": "oxc.oxc-vscode",
+	"editor.formatOnSave": true,
+	"oxc.path.oxlint": "node_modules/.bin/oxlint",
+	"oxc.typeAware": true
+}

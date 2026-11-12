@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Lint, test & validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Linting & Type check
+        run: npm run lint
+
+      - name: Type check with tsc
+        run: npm run typecheck
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Run tests (oxlint and ESLint RuleTesters)
+        run: npm run test
+
+      - name: Build and test the built package
+        run: npm run test:dist
+
+      - name: Validate
+        run: npx @arethetypeswrong/cli --pack . --ignore-rules=no-resolution
+
+  node-versions:
+    name: Tests on Node ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Build and test the built package
+        run: npm run test:dist
+
+  # Runs the rules on the lowest and latest linter versions the peer dependency ranges allow.
+  linter-versions:
+    name: Tests on oxlint ${{ matrix.oxlint }}, ESLint ${{ matrix.eslint }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - oxlint: 1.91.0
+            eslint: 9.0.0
+          - oxlint: latest
+            eslint: 9
+          - oxlint: latest
+            eslint: latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install the versions under test
+        run: npm install --no-save oxlint@${{ matrix.oxlint }} eslint@${{ matrix.eslint }}
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Build and test the built package
+        run: npm run test:dist

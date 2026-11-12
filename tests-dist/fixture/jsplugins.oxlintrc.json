@@ -1,0 +1,11 @@
+{
+	"jsPlugins": ["@cerios/sparta-lint-rules"],
+	"settings": {
+		"sparta": { "areas": { "web": "ui" } }
+	},
+	"rules": {
+		"sparta/architecture-boundaries": "error",
+		"sparta/no-hard-waits": "error",
+		"sparta/no-nested-polling": "error"
+	}
+}

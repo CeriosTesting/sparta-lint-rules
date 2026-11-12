@@ -1,0 +1,121 @@
+{
+	"name": "@cerios/sparta-lint-rules",
+	"version": "0.0.0",
+	"description": "Lint rules for the SPARTA (Simply Powerful Automated Regression Test Architecture) test automation architecture. Works with oxlint and ESLint.",
+	"keywords": [
+		"architecture",
+		"eslint",
+		"eslint-plugin",
+		"eslintplugin",
+		"lint",
+		"oxlint",
+		"oxlint-plugin",
+		"playwright",
+		"sparta",
+		"test-automation",
+		"testing"
+	],
+	"homepage": "https://github.com/CeriosTesting/sparta-lint-rules#readme",
+	"bugs": {
+		"url": "https://github.com/CeriosTesting/sparta-lint-rules/issues"
+	},
+	"license": "MIT",
+	"author": "Ronald Veth - Cerios",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/CeriosTesting/sparta-lint-rules.git"
+	},
+	"files": [
+		"dist"
+	],
+	"type": "commonjs",
+	"sideEffects": false,
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.cts",
+	"exports": {
+		"./package.json": "./package.json",
+		".": {
+			"import": {
+				"types": "./dist/index.d.mts",
+				"default": "./dist/index.mjs"
+			},
+			"default": {
+				"types": "./dist/index.d.cts",
+				"default": "./dist/index.cjs"
+			}
+		},
+		"./oxlint": {
+			"import": {
+				"types": "./dist/oxlint.d.mts",
+				"default": "./dist/oxlint.mjs"
+			},
+			"default": {
+				"types": "./dist/oxlint.d.cts",
+				"default": "./dist/oxlint.cjs"
+			}
+		},
+		"./settings": {
+			"import": {
+				"types": "./dist/settings.d.mts",
+				"default": "./dist/settings.mjs"
+			},
+			"default": {
+				"types": "./dist/settings.d.cts",
+				"default": "./dist/settings.cjs"
+			}
+		}
+	},
+	"scripts": {
+		"build": "tsdown",
+		"changeset": "changeset",
+		"check-exports": "attw --pack .",
+		"format": "oxfmt",
+		"format:check": "oxfmt --check",
+		"lint": "oxlint --type-aware --type-check",
+		"lint:fix": "oxlint --type-aware --type-check --fix",
+		"prepare": "husky",
+		"release": "changeset publish",
+		"test": "vitest run",
+		"test:dist": "npm run build && vitest run --config vitest.dist.config.mts",
+		"typecheck": "tsc --noEmit",
+		"update-all-packages": "npm-check-updates -u && npm i",
+		"version-packages": "changeset version && npm install --package-lock-only --ignore-scripts",
+		"version-packages:prepare-release": "npm run version-packages && npm run format"
+	},
+	"dependencies": {
+		"@oxlint/plugins": "^1.93.0",
+		"oxc-parser": "^0.158.0"
+	},
+	"devDependencies": {
+		"@arethetypeswrong/cli": "^0.18.5",
+		"@changesets/cli": "^3.0.3",
+		"@types/node": "^26.6.6",
+		"@typescript-eslint/parser": "^8.72.2",
+		"eslint": "^10.14.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^17.6.0",
+		"npm-check-updates": "^23.1.1",
+		"oxfmt": "^0.78.0",
+		"oxlint": "^1.93.0",
+		"oxlint-tsgolint": "^7.0.2006",
+		"tsdown": "^0.23.7",
+		"typescript": "^6.0.3",
+		"vitest": "^5.1.0"
+	},
+	"peerDependencies": {
+		"eslint": ">=9.0.0",
+		"oxlint": ">=1.91.0"
+	},
+	"peerDependenciesMeta": {
+		"eslint": {
+			"optional": true
+		},
+		"oxlint": {
+			"optional": true
+		}
+	},
+	"engines": {
+		"node": "^22.18.0 || >=24.11.0"
+	}
+}

@@ -1,0 +1,20 @@
+{
+	// Editor-only: the package is linked into ./node_modules just for `npm run test:dist`,
+	// so map the self-import to the sources to keep the config file resolvable in the IDE.
+	// The other fixture files are deliberately left out — they contain intentional violations.
+	"compilerOptions": {
+		"target": "es2023",
+		"module": "preserve",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"skipLibCheck": true,
+		"noEmit": true,
+		"types": ["node"],
+		"paths": {
+			"@cerios/sparta-lint-rules/oxlint": ["../../src/oxlint.ts"],
+			"@cerios/sparta-lint-rules/settings": ["../../src/settings.ts"],
+			"@cerios/sparta-lint-rules": ["../../src/index.ts"]
+		}
+	},
+	"files": ["recommended.oxlint.config.ts"]
+}

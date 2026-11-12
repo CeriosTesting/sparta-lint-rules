@@ -1,0 +1,20 @@
+{
+	"compilerOptions": {
+		"target": "es2023",
+		"module": "preserve",
+		"moduleResolution": "bundler",
+		"resolveJsonModule": true,
+		"noEmit": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"strict": true,
+		"strictPropertyInitialization": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"skipLibCheck": true,
+		"outDir": "dist",
+		"types": ["node", "vitest/globals"]
+	},
+	"include": ["src", "tests", "tests-dist", "tsdown.config.mts", "vitest.config.mts", "vitest.dist.config.mts"],
+	"exclude": ["tests-dist/fixture"]
+}
