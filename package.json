@@ -1,6 +1,6 @@
 {
 	"name": "@cerios/sparta-lint-rules",
-	"version": "0.0.0",
+	"version": "0.0.1",
 	"description": "Lint rules for the SPARTA (Simply Powerful Automated Regression Test Architecture) test automation architecture. Works with oxlint and ESLint.",
 	"keywords": [
 		"architecture",
