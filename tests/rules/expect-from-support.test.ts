@@ -10,6 +10,16 @@ runRule("expect-from-support", rule, {
 		{ code: `import { expect } from "@sparta/support";`, filename: ASSERTER },
 		{ code: `import { test } from "@playwright/test";`, filename: ASSERTER },
 		{
+			name: "a subpath of the support module",
+			code: `import { expect } from "@sparta/support/assertions";`,
+			filename: ASSERTER,
+		},
+		{
+			name: "a relative import into the support folder",
+			code: `import { expect } from "../../../support/expect";`,
+			filename: ASSERTER,
+		},
+		{
 			name: "sparta/support defines the shared expect",
 			code: `import { expect } from "@playwright/test";`,
 			filename: file("sparta/support/expect.ts"),
@@ -29,6 +39,13 @@ runRule("expect-from-support", rule, {
 		},
 	],
 	invalid: [
+		{
+			name: "a module that only starts with the support module name",
+			code: `import { expect } from "@sparta/supportive";`,
+			filename: ASSERTER,
+			output: `import { expect } from "@sparta/support";`,
+			errors: [{ messageId: "expectFromSupport" }],
+		},
 		{
 			code: `import { expect } from "@playwright/test";`,
 			filename: ASSERTER,

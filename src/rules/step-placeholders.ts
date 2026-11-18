@@ -8,7 +8,8 @@ const NAMED = /\{\{(.*?)\}\}/g;
 
 const INDEX = /\[\[(\d+)\]\]/g;
 
-const SINGLE_BRACES = /(^|[^{])\{([A-Za-z_$][\w$]*(?:\.[\w$]+)*)\}(?!\})/g;
+/** A lookbehind instead of a consumed prefix character, so adjacent placeholders (`{a}{b}`) are all found. */
+const SINGLE_BRACES = /(?<!\{)\{([A-Za-z_$][\w$]*(?:\.[\w$]+)*)\}(?!\})/g;
 
 const findAll = (pattern: RegExp, text: string): RegExpExecArray[] => {
 	const regex = new RegExp(pattern.source, "g");
@@ -29,6 +30,13 @@ const paramName = (param: AstNode): string | undefined => {
 	return binding.type === "Identifier" ? binding.name : undefined;
 };
 
+/** True when a placeholder path starts at a parameter, or at `this` (a property of the instance). */
+const isKnownRoot = (path: string, names: readonly (string | undefined)[]): boolean => {
+	const [root] = path.split(".");
+
+	return root === "this" || names.includes(root);
+};
+
 /**
  * What is wrong with the path of a `{{path}}` placeholder, if anything. `@step` reads the path exactly as written,
  * so spaces around it either fail the parameter lookup or read a property that does not exist.
@@ -38,7 +46,7 @@ const namedProblem = (
 	names: readonly (string | undefined)[]
 ): "whitespace" | "unknownParameter" | undefined => {
 	const trimmed = path.trim();
-	const isParameter = (value: string): boolean => names.includes(value.split(".")[0]);
+	const isParameter = (value: string): boolean => isKnownRoot(value, names);
 
 	if (trimmed !== path && isParameter(trimmed)) return "whitespace";
 
@@ -142,12 +150,12 @@ const rule: Rule = {
 				}
 
 				for (const match of findAll(SINGLE_BRACES, raw)) {
-					const placeholder = match[2];
-					const from = start + match.index + match[1].length;
+					const placeholder = match[1];
+					const from = start + match.index;
 					const range: [number, number] = [from, from + placeholder.length + 2];
 					const data = { found: `{${placeholder}}`, expected: `{{${placeholder}}}` };
 
-					if (names.includes(placeholder.split(".")[0])) {
+					if (isKnownRoot(placeholder, names)) {
 						context.report({
 							node: description,
 							messageId: "singleBraces",

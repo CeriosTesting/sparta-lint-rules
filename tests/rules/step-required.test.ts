@@ -40,6 +40,26 @@ runRule("step-required", rule, {
 			filename: file("sparta/api/orders/services/orders-service.ts"),
 		},
 		{
+			name: "static methods are helpers, not steps",
+			code: `class OrdersStepper {
+	static create(page: Page) {
+		return new OrdersStepper(page);
+	}
+}`,
+			filename: STEPPER,
+		},
+		{
+			name: "non-public, static and plain properties are fine",
+			code: `class OrdersStepper {
+	private readonly format = (value: string) => value.trim();
+	protected parse = () => 1;
+	#hidden = () => 2;
+	static build = () => 3;
+	readonly timeout = 5_000;
+}`,
+			filename: STEPPER,
+		},
+		{
 			name: "overload signatures do not need a decorator",
 			code: `class OrdersStepper {
 	open(id: string): void;
@@ -73,6 +93,18 @@ runRule("step-required", rule, {
 			filename: file("src/api/orders/steppers/orders-stepper.ts"),
 			settings: { sparta: { folders: { sparta: "src" } } },
 			errors: [{ messageId: "missingStep", data: { method: "open", layer: "stepper" } }],
+		},
+		{
+			name: "a public arrow-function property cannot carry @step",
+			code: `class OrdersStepper {
+	open = async (orderId: string) => {};
+	readonly close = async function () {};
+}`,
+			filename: STEPPER,
+			errors: [
+				{ messageId: "functionProperty", data: { method: "open", layer: "stepper" } },
+				{ messageId: "functionProperty", data: { method: "close", layer: "stepper" } },
+			],
 		},
 	],
 });

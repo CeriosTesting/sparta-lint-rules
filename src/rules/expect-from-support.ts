@@ -1,7 +1,7 @@
 import type { Conventions } from "../utils/conventions";
 import { docsUrl } from "../utils/docs";
 import { conventionsFor, rootFor } from "../utils/settings";
-import { projectPath } from "../utils/sparta-paths";
+import { projectPath, resolveImport } from "../utils/sparta-paths";
 import type { Rule } from "../utils/types";
 
 /** Files inside the sparta folder, except its support folder (where `expect` itself is defined). */
@@ -28,14 +28,29 @@ const rule: Rule = {
 	create(context) {
 		const conventions = conventionsFor(context);
 		const { supportModule } = conventions;
+		const root = rootFor(context, conventions);
 
-		if (!appliesTo(context.filename, conventions, rootFor(context, conventions))) return {};
+		if (!appliesTo(context.filename, conventions, root)) return {};
+
+		/**
+		 * The support module, a subpath of it, or a relative import into the support folder. Other aliases for that
+		 * folder are reported, so the configured module name stays the one that is used.
+		 */
+		const isSupport = (source: string): boolean => {
+			if (source === supportModule || source.startsWith(`${supportModule}/`)) return true;
+			if (!source.startsWith(".")) return false;
+
+			const resolved = resolveImport(context.filename, source, root, conventions);
+			const file = resolved === undefined ? undefined : projectPath(resolved, root);
+
+			return file?.match(conventions.patterns.top)?.[1] === "support";
+		};
 
 		return {
 			ImportDeclaration(node): void {
 				const source = node.source.value;
 
-				if (source === supportModule) return;
+				if (isSupport(String(source))) return;
 
 				const specifier = node.specifiers.find(
 					item =>

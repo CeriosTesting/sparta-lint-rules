@@ -12,7 +12,7 @@ In `sparta/` and `tests/` (except `tests/framework/`), the following are reporte
 
 - `x.waitForTimeout(...)`
 - `new Promise(resolve => setTimeout(resolve, ms))` and equivalents, where the timer callback does nothing but resolve the promise (`setTimeout`, `globalThis.setTimeout` and `window.setTimeout`)
-- importing `setTimeout` from `timers/promises` or `node:timers/promises`
+- the sleeps of `timers/promises` and `node:timers/promises`, however the module is imported or required: `import { setTimeout }`, `const { setTimeout } = require(...)`, `timers.setTimeout(ms)` on a default or namespace import, and `scheduler.wait(ms)`
 
 Wait for a state instead, with web-first assertions or with polling (`toPass`, `poll`) in a stepper or asserter.
 

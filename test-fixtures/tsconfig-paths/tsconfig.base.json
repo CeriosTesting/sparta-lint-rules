@@ -1,0 +1,12 @@
+{
+	// Shared settings, as in a base config that project configs extend.
+	"compilerOptions": {
+		"baseUrl": ".",
+		"paths": {
+			/* Only the second target exists, so it is the one that counts. */
+			"@pages/*": ["generated/pages/*", "sparta/ui/shop/pages/*"],
+			"@steppers/*": ["sparta/ui/shop/steppers/*"],
+			"@support": ["sparta/support/index.ts"]
+		}
+	}
+}

@@ -57,7 +57,7 @@ describe("built package", () => {
 		const esm = ((await import(pathToFileURL(path.join(ROOT, "dist/index.mjs")).href)) as { default: Plugin }).default;
 
 		expect(cjs.meta.name).toBe("sparta");
-		expect(Object.keys(cjs.rules)).toHaveLength(13);
+		expect(Object.keys(cjs.rules)).toHaveLength(14);
 		expect(esm.meta).toEqual(cjs.meta);
 		expect(Object.keys(esm.rules)).toEqual(Object.keys(cjs.rules));
 		expect(esm.configs.recommended.rules).toEqual(cjs.configs.recommended.rules);

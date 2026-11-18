@@ -10,6 +10,8 @@ Require `expect` to be imported from `@sparta/support` inside `sparta/`.
 
 `sparta/support` provides the project's `expect`, extended with custom matchers. Importing `expect` from anywhere else (such as `@playwright/test`) skips those matchers. Files inside `sparta/support/` itself are not checked.
 
+The support module itself, its subpaths (`@sparta/support/assertions`) and relative imports into `sparta/support/` are all accepted.
+
 ## Settings
 
 Configured through [`settings.sparta`](../../README.md#configuration). `supportModule` sets the module `expect` must come from, also for the autofix. `folders.sparta` sets the folder the rule applies to.
@@ -25,4 +27,6 @@ import { expect } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 // ✅
 import { expect } from "@sparta/support";
+// ✅
+import { expect } from "@sparta/support/assertions";
 ```

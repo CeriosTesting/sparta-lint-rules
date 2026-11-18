@@ -19,13 +19,69 @@ export const g = () => 1;`,
 function f(a: number): void;
 function f(a: unknown): void {}`,
 		},
+		{
+			name: "multi-line exported overload signatures stay together",
+			code: `export function find(
+	id: string,
+): Order;
+export function find(filter: OrderFilter): Order[];
+export function find(arg: string | OrderFilter): Order | Order[] {
+	return lookup(arg);
+}
+
+export const other = 1;`,
+		},
 		`const o = { a: 1, b() {} };`,
 		`const o = {
 	a: 1,
 	b: 2,
 };`,
+		{
+			name: "single-line methods in an object literal need no blank lines",
+			code: `const o = {
+	label: "a",
+	filter: (order: Order) => order.ok,
+	map(order: Order) { return order.id; },
+	get total() { return 1; },
+	size: 2,
+};`,
+		},
 	],
 	invalid: [
+		{
+			name: "blank lines between overloads are removed",
+			code: `export function find(id: string): Order;
+
+export function find(filter: OrderFilter): Order[];
+
+
+export function find(arg: string | OrderFilter): Order | Order[] {
+	return lookup(arg);
+}`,
+			output: `export function find(id: string): Order;
+export function find(filter: OrderFilter): Order[];
+export function find(arg: string | OrderFilter): Order | Order[] {
+	return lookup(arg);
+}`,
+			errors: [{ messageId: "betweenOverloads" }, { messageId: "betweenOverloads" }],
+		},
+		{
+			name: "comments between overloads are kept",
+			code: `namespace N {
+	function f(a: string): void;
+
+	// numbers
+	function f(a: number): void;
+	function f(a: unknown): void {}
+}`,
+			output: `namespace N {
+	function f(a: string): void;
+	// numbers
+	function f(a: number): void;
+	function f(a: unknown): void {}
+}`,
+			errors: [{ messageId: "betweenOverloads" }],
+		},
 		{
 			code: `import a from "a";
 const b = a;`,
@@ -72,6 +128,26 @@ const b = 2;`,
 	},
 };`,
 			errors: [{ messageId: "betweenObjectMethods" }],
+		},
+		{
+			name: "a multi-line method next to a single-line one still needs a blank line",
+			code: `const o = {
+	filter: (order: Order) => order.ok,
+	b() {
+		return 1;
+	},
+	c: () => 2,
+};`,
+			output: `const o = {
+	filter: (order: Order) => order.ok,
+
+	b() {
+		return 1;
+	},
+
+	c: () => 2,
+};`,
+			errors: [{ messageId: "betweenObjectMethods" }, { messageId: "betweenObjectMethods" }],
 		},
 	],
 });
