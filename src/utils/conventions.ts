@@ -37,7 +37,7 @@ export type LayerFolder = keyof typeof LAYER_FOLDERS;
 /** Layer folders that live directly in an area (`sparta/<area>/builders/`), shared by its groups, not in a group. */
 export const AREA_LAYER_FOLDERS: ReadonlySet<LayerFolder> = new Set(["builders", "directors"]);
 
-const AREAS: readonly Area[] = ["api", "database", "desktop", "mobile", "ui"];
+export const AREAS: readonly Area[] = ["api", "database", "desktop", "mobile", "ui"];
 
 /** Folders directly below the sparta folder that are not areas. */
 const TOP_LEVEL_FOLDERS = ["common", "fixtures", "scenarios", "support"];

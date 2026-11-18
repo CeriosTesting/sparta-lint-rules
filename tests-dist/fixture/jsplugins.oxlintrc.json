@@ -1,4 +1,5 @@
 {
+	"$schema": "./node_modules/@cerios/sparta-lint-rules/oxlintrc.schema.json",
 	"jsPlugins": ["@cerios/sparta-lint-rules"],
 	"settings": {
 		"sparta": { "areas": { "web": "ui" } }
