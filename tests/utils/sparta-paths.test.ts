@@ -67,6 +67,41 @@ describe("resolveImport", () => {
 	});
 });
 
+describe("resolveImport through tsconfig", () => {
+	const PROJECT = fixture("tsconfig-paths");
+	const FROM = `${PROJECT}/sparta/ui/shop/pages/cart-page.ts`;
+	const resolve = (request: string, conventions = DEFAULT_CONVENTIONS): string | undefined =>
+		resolveImport(FROM, request, PROJECT, conventions);
+
+	it("resolves paths from the nearest tsconfig.json, including what it extends", () => {
+		expect(resolve("@steppers/cart-stepper")).toBe(`${PROJECT}/sparta/ui/shop/steppers/cart-stepper`);
+		expect(resolve("@support")).toBe(`${PROJECT}/sparta/support/index.ts`);
+	});
+
+	it("takes the first target that exists, or the first target when none does", () => {
+		expect(resolve("@pages/cart-page")).toBe(`${PROJECT}/sparta/ui/shop/pages/cart-page`);
+		expect(resolve("@pages/new-page")).toBe(`${PROJECT}/generated/pages/new-page`);
+	});
+
+	it("resolves bare imports against baseUrl only when the file exists", () => {
+		expect(resolve("sparta/ui/admin/pages/users-page")).toBe(`${PROJECT}/sparta/ui/admin/pages/users-page`);
+		expect(resolve("sparta/ui/admin")).toBe(`${PROJECT}/sparta/ui/admin`);
+		expect(resolve("sparta/ui/admin/pages/missing-page")).toBeUndefined();
+		expect(resolve("@playwright/test")).toBeUndefined();
+	});
+
+	it("keeps the standard aliases", () => {
+		expect(resolve("@sparta/support/waits")).toBe(`${PROJECT}/sparta/support/waits`);
+	});
+
+	it("prefers existing tsconfig targets over settings aliases, and settings aliases over missing targets", () => {
+		const conventions = parseSettings({ aliases: { "@pages/*": "sparta" } }, process.cwd());
+
+		expect(resolve("@pages/cart-page", conventions)).toBe(`${PROJECT}/sparta/ui/shop/pages/cart-page`);
+		expect(resolve("@pages/new-page", conventions)).toBe(`${PROJECT}/sparta/new-page`);
+	});
+});
+
 describe("classify with settings", () => {
 	it("treats a custom area like its standard area, but as its own area folder", () => {
 		expect(classify("/p/src/web/shop/page-objects/cart-page.ts", CUSTOM, "/p")).toEqual({
@@ -101,6 +136,70 @@ describe("classify with settings", () => {
 		});
 		expect(isLayerFile("/p/src/web/shop/page-objects/cart-page.ts", CUSTOM, "/p")).toBe(true);
 		expect(isLayerFile("/p/src/web/shop/helpers/format.ts", CUSTOM, "/p")).toBe(false);
+	});
+});
+
+describe("builders and directors", () => {
+	const DATA = parseSettings({ areas: { web: "ui" }, layers: { "data-builders": "builders" } }, process.cwd());
+
+	it("classifies the builders and directors folders of an area as area layers", () => {
+		expect(classify("/p/sparta/api/builders/order-builder.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({
+			kind: "area-layer",
+			area: "api",
+			areaFolder: "api",
+			layer: "builder",
+		});
+		expect(classify("/p/sparta/ui/directors/cart-director.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({
+			kind: "area-layer",
+			area: "ui",
+			areaFolder: "ui",
+			layer: "director",
+		});
+		expect(classify("/p/sparta/api/builders", DEFAULT_CONVENTIONS, "/p")?.kind).toBe("area-layer");
+	});
+
+	it("follows custom areas and custom layer folders", () => {
+		expect(classify("/p/sparta/web/data-builders/cart-builder.ts", DATA, "/p")).toEqual({
+			kind: "area-layer",
+			area: "ui",
+			areaFolder: "web",
+			layer: "builder",
+		});
+		expect(layerFolder("/p/sparta/web/data-builders/cart-builder.ts", DATA, "/p")).toEqual({
+			name: "data-builders",
+			standard: "builders",
+		});
+	});
+
+	it("gives the area folder as the layer folder, also for files in a subfolder", () => {
+		expect(layerFolder("/p/sparta/api/builders/order-builder.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({
+			name: "builders",
+			standard: "builders",
+		});
+		expect(layerFolder("/p/sparta/api/builders/orders/order-builder.ts", DEFAULT_CONVENTIONS, "/p")?.name).toBe(
+			"builders"
+		);
+		expect(isLayerFile("/p/sparta/api/directors/order-director.ts", DEFAULT_CONVENTIONS, "/p")).toBe(true);
+	});
+
+	it("classifies desktop windows like ui pages", () => {
+		expect(classify("/p/sparta/desktop/app/windows/main-window.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({
+			kind: "group",
+			area: "desktop",
+			areaFolder: "desktop",
+			group: "app",
+			layer: "window",
+		});
+	});
+
+	it("keeps builders in a group folder classified as that group", () => {
+		expect(classify("/p/sparta/ui/shop/builders/cart-builder.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({
+			kind: "group",
+			area: "ui",
+			areaFolder: "ui",
+			group: "shop",
+			layer: "builder",
+		});
 	});
 });
 

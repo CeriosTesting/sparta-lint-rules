@@ -19,6 +19,24 @@ runRule("no-hard-waits", rule, {
 			filename: STEPPER,
 		},
 		{ code: `import { setInterval } from "node:timers/promises";`, filename: STEPPER },
+		{
+			name: "other members of timers/promises are not sleeps",
+			code: `import timers from "node:timers/promises";
+for await (const tick of timers.setInterval(10)) break;`,
+			filename: STEPPER,
+		},
+		{
+			name: "a wait() on something else is not a sleep",
+			code: `import { scheduler } from "node:timers/promises";
+await queue.wait();
+await scheduler.yield();`,
+			filename: STEPPER,
+		},
+		{
+			name: "setTimeout on an object that is not the timers module",
+			code: `test.setTimeout(60_000);`,
+			filename: SPEC,
+		},
 		{ code: `await page.waitForTimeout(1000);`, filename: file("tests/framework/helpers.ts") },
 		`await page.waitForTimeout(1000);`,
 	],
@@ -38,6 +56,37 @@ runRule("no-hard-waits", rule, {
 			code: `import { setTimeout } from "node:timers/promises";`,
 			filename: STEPPER,
 			errors: [{ messageId: "hardWait" }],
+		},
+		{
+			name: "default import of timers/promises",
+			code: `import timers from "timers/promises";
+await timers.setTimeout(100);`,
+			filename: STEPPER,
+			errors: [{ messageId: "hardWait" }],
+		},
+		{
+			name: "namespace import of timers/promises",
+			code: `import * as timers from "node:timers/promises";
+await timers.setTimeout(100);
+await timers.scheduler.wait(100);`,
+			filename: STEPPER,
+			errors: [{ messageId: "hardWait" }, { messageId: "hardWait" }],
+		},
+		{
+			name: "scheduler.wait from timers/promises",
+			code: `import { scheduler as s } from "node:timers/promises";
+await s.wait(100);`,
+			filename: STEPPER,
+			errors: [{ messageId: "hardWait" }],
+		},
+		{
+			name: "require of timers/promises",
+			code: `const timers = require("node:timers/promises");
+const { setTimeout: sleep, scheduler } = require("timers/promises");
+await timers.setTimeout(100);
+await scheduler.wait(100);`,
+			filename: STEPPER,
+			errors: [{ messageId: "hardWait" }, { messageId: "hardWait" }, { messageId: "hardWait" }],
 		},
 		{
 			name: "settings: files in the configured folders",

@@ -50,15 +50,16 @@ Register the plugin with `jsPlugins` and enable the rules you want:
 	"rules": {
 		"sparta/architecture-boundaries": "error",
 		"sparta/class-matches-filename": "warn",
+		"sparta/director-composes-builders": "warn",
 		"sparta/expect-from-support": "error",
 		"sparta/file-naming": "warn",
 		"sparta/lines-between-class-members": "warn",
+		"sparta/member-ordering": "warn",
 		"sparta/no-direct-construction-in-tests": "error",
 		"sparta/no-expect-in-tests": "error",
 		"sparta/no-hard-waits": "error",
 		"sparta/no-nested-polling": "error",
 		"sparta/padding-lines": "warn",
-		"sparta/private-members-last": "warn",
 		"sparta/step-placeholders": "error",
 		"sparta/step-required": "warn"
 	}
@@ -84,8 +85,10 @@ The rules recognise files by their path, so they rely on the SPARTA folder conve
 ```text
 <project>/
 ├── sparta/
-│   ├── api/                      # area: api, database, ui or mobile
+│   ├── api/                      # area: api, database, ui, mobile or desktop
 │   │   ├── common/               # shared within the area
+│   │   ├── builders/             # *-builder.ts, test data builders shared by the area's groups
+│   │   ├── directors/            # *-director.ts, compose several builders
 │   │   └── <group>/              # e.g. orders
 │   │       ├── clients/          # *-client.ts
 │   │       ├── services/         # *-service.ts
@@ -93,8 +96,9 @@ The rules recognise files by their path, so they rely on the SPARTA folder conve
 │   │       ├── asserters/        # *-asserter.ts
 │   │       └── scenarios/        # *-scenario.ts
 │   ├── database/<group>/         # repositories/, services/, steppers/, asserters/, scenarios/, ...
-│   ├── ui/<group>/               # pages/, components/, builders/, directors/, steppers/, ...
+│   ├── ui/<group>/               # pages/, components/, steppers/, asserters/, scenarios/
 │   ├── mobile/<group>/           # like ui, with screens/ (*-screen.ts) in place of pages/
+│   ├── desktop/<group>/          # like ui, with windows/ (*-window.ts) in place of pages/, for Windows apps
 │   ├── scenarios/                # cross-area scenarios
 │   ├── fixtures/                 # Playwright fixtures that wire everything up
 │   ├── common/                   # shared, area-independent code
@@ -103,7 +107,7 @@ The rules recognise files by their path, so they rely on the SPARTA folder conve
     └── framework/                # framework tests; never checked
 ```
 
-Imports through the `@sparta/*` and `@tests/*` path aliases are resolved to `<project>/sparta/` and `<project>/tests/`. Files elsewhere are not affected by the path-based rules.
+Imports through the `@sparta/*` and `@tests/*` path aliases are resolved to `<project>/sparta/` and `<project>/tests/`, and the `paths` and `baseUrl` of your `tsconfig.json` are followed as well (see [import resolution](#import-resolution)). Files elsewhere are not affected by the path-based rules.
 
 ---
 
@@ -118,17 +122,17 @@ Without configuration, the rules use the SPARTA names shown above. If your proje
 
 The standard names keep working next to yours. The layer rules, isolation and re-export checks themselves are not configurable. To switch a check off, use the linter itself (rule severity, `ignores`, overrides), where it stays visible.
 
-| Setting          | Default                                              | What it does                                                                                                                                   | Used by                                                                             |
-| ---------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `root`           | nearest folder with a `package.json`                 | Project root: aliases resolve against it, and only paths below it are matched. A relative path resolves against the folder the linter runs in. | all path-based rules                                                                |
-| `folders`        | `{ sparta: "sparta", tests: "tests" }`               | Names of the two top-level folders. Replaces the defaults.                                                                                     | all path-based rules                                                                |
-| `areas`          | `api`, `database`, `mobile`, `ui`                    | Extra area folders, each following a standard area: `{ web: "ui" }`. Each area folder is still isolated from the others.                       | all path-based rules                                                                |
-| `layers`         | `pages`, `steppers`, `services`, ...                 | Extra layer folders, each following a standard layer folder (its layer rules and file suffix): `{ "page-objects": "pages" }`.                  | `architecture-boundaries`, `file-naming`, `class-matches-filename`, `step-required` |
-| `aliases`        | `@sparta/*` → `sparta`, `@tests/*` → `tests`         | Extra path aliases, in tsconfig syntax, pointing to `sparta` or `tests`: `{ "@app/*": "sparta" }`.                                             | `architecture-boundaries`, `no-nested-polling`                                      |
-| `supportModule`  | `@sparta/support`                                    | The module `expect` must come from. Replaces the default.                                                                                      | `expect-from-support`                                                               |
-| `pollingMethods` | `toPass`, `toPassAndReturn`, `poll`, `pollAndReturn` | Extra retrying methods, called as `x.method(callback)` or `x(callback).method()`.                                                              | `no-nested-polling`                                                                 |
-| `stepDecorators` | `step`                                               | Extra decorators that count as `@step`.                                                                                                        | `step-required`, `step-placeholders`                                                |
-| `expectNames`    | `expect`, `expectly…`                                | Extra assertion functions that tests must not call.                                                                                            | `no-expect-in-tests`                                                                |
+| Setting          | Default                                              | What it does                                                                                                                                   | Used by                                                                                                                                              |
+| ---------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `root`           | nearest folder with a `package.json`                 | Project root: aliases resolve against it, and only paths below it are matched. A relative path resolves against the folder the linter runs in. | all path-based rules                                                                                                                                 |
+| `folders`        | `{ sparta: "sparta", tests: "tests" }`               | Names of the two top-level folders. Replaces the defaults.                                                                                     | all path-based rules                                                                                                                                 |
+| `areas`          | `api`, `database`, `desktop`, `mobile`, `ui`         | Extra area folders, each following a standard area: `{ web: "ui" }`. Each area folder is still isolated from the others.                       | all path-based rules                                                                                                                                 |
+| `layers`         | `pages`, `steppers`, `services`, ...                 | Extra layer folders, each following a standard layer folder (its layer rules and file suffix): `{ "page-objects": "pages" }`.                  | `architecture-boundaries`, `file-naming`, `class-matches-filename`, `step-required`, `no-direct-construction-in-tests`, `director-composes-builders` |
+| `aliases`        | `@sparta/*` → `sparta`, `@tests/*` → `tests`         | Extra path aliases pointing to `sparta` or `tests`: `{ "@app/*": "sparta" }`. Only needed when they are not in your tsconfig `paths`.          | `architecture-boundaries`, `no-nested-polling`, `no-direct-construction-in-tests`, `director-composes-builders`                                      |
+| `supportModule`  | `@sparta/support`                                    | The module `expect` must come from. Replaces the default.                                                                                      | `expect-from-support`                                                                                                                                |
+| `pollingMethods` | `toPass`, `toPassAndReturn`, `poll`, `pollAndReturn` | Extra retrying methods, called as `x.method(callback)` or `x(callback).method()`.                                                              | `no-nested-polling`                                                                                                                                  |
+| `stepDecorators` | `step`                                               | Extra decorators that count as `@step`.                                                                                                        | `step-required`, `step-placeholders`                                                                                                                 |
+| `expectNames`    | `expect`, `expectly…`                                | Extra assertion functions that tests must not call.                                                                                            | `no-expect-in-tests`                                                                                                                                 |
 
 A mistake in the settings stops the lint run with a clear message, so a typo can't silently weaken the checks:
 
@@ -185,25 +189,37 @@ The project root is the nearest folder, from the linted file upwards, that conta
 
 Only the part of a file's path below the root is matched against the SPARTA folder names. A checkout inside a folder named `tests` or `sparta` therefore doesn't change how files are classified, and files outside the root aren't checked by the path-based rules.
 
+### Import resolution
+
+The rules that follow imports (`architecture-boundaries`, `no-direct-construction-in-tests`, `no-nested-polling`) resolve them as TypeScript does, in this order:
+
+1. relative imports (`./`, `../`);
+2. `compilerOptions.paths` of the nearest `tsconfig.json` above the linted file, including what it `extends` (local files and packages). Of several targets, the first that exists is used, so `"@pages/*": ["sparta/ui/shop/pages/*"]` is checked like the folder it points to;
+3. the `@sparta/*` and `@tests/*` aliases and `settings.sparta.aliases`, against the [project root](#project-root);
+4. `compilerOptions.baseUrl`, for imports such as `sparta/ui/shop/pages/cart-page`, only when that file exists, so packages are never mistaken for project files.
+
+Package imports are not checked. A `tsconfig.json` that can't be read, or whose `extends` can't be found, stops the lint run with a message naming the file. Only `tsconfig.json` is looked up; project references are not followed.
+
 ---
 
 ## Rules
 
-| Rule                                                                             | Description                                                             | Recommended | Fix |
-| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------- | --- |
-| [architecture-boundaries](docs/rules/architecture-boundaries.md)                 | Enforce the SPARTA layer and isolation boundaries between imports       | error       |     |
-| [class-matches-filename](docs/rules/class-matches-filename.md)                   | One class per layer file, named after the file                          | warn        |     |
-| [expect-from-support](docs/rules/expect-from-support.md)                         | Import `expect` from the support module inside `sparta/`                | error       | 🔧  |
-| [file-naming](docs/rules/file-naming.md)                                         | Files in a layer folder end with the layer suffix                       | warn        |     |
-| [lines-between-class-members](docs/rules/lines-between-class-members.md)         | Blank line after every multi-line class member                          | warn        | 🔧  |
-| [no-direct-construction-in-tests](docs/rules/no-direct-construction-in-tests.md) | No `new XStepper()` and friends in tests; use fixtures                  | error       |     |
-| [no-expect-in-tests](docs/rules/no-expect-in-tests.md)                           | No `expect` in tests; checks belong in steppers and asserters           | error       |     |
-| [no-hard-waits](docs/rules/no-hard-waits.md)                                     | No `waitForTimeout` or `setTimeout` sleeps                              | error       |     |
-| [no-nested-polling](docs/rules/no-nested-polling.md)                             | No poll inside a poll callback, also through calls into other files     | error       |     |
-| [padding-lines](docs/rules/padding-lines.md)                                     | Blank lines after imports, around functions and around object methods   | warn        | 🔧  |
-| [private-members-last](docs/rules/private-members-last.md)                       | Public methods above private methods                                    | warn        |     |
-| [step-placeholders](docs/rules/step-placeholders.md)                             | Validate `@step` description placeholders against the method parameters | error       | 🔧  |
-| [step-required](docs/rules/step-required.md)                                     | Public methods of steppers, asserters and scenarios need `@step`        | warn        |     |
+| Rule                                                                             | Description                                                                            | Recommended | Fix |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------- | --- |
+| [architecture-boundaries](docs/rules/architecture-boundaries.md)                 | Enforce the SPARTA layer and isolation boundaries between imports                      | error       |     |
+| [class-matches-filename](docs/rules/class-matches-filename.md)                   | One class per layer file, named after the file                                         | warn        |     |
+| [director-composes-builders](docs/rules/director-composes-builders.md)           | A director composes several builders; a single-builder director belongs on the builder | warn        |     |
+| [expect-from-support](docs/rules/expect-from-support.md)                         | Import `expect` from the support module inside `sparta/`                               | error       | 🔧  |
+| [file-naming](docs/rules/file-naming.md)                                         | Files in a layer folder are kebab-case and end with the layer suffix                   | warn        |     |
+| [lines-between-class-members](docs/rules/lines-between-class-members.md)         | Blank line after multi-line methods; none between overloads                            | warn        | 🔧  |
+| [member-ordering](docs/rules/member-ordering.md)                                 | Properties, constructor, methods; static first; public before private                  | warn        |     |
+| [no-direct-construction-in-tests](docs/rules/no-direct-construction-in-tests.md) | No constructing layer classes (`new OrdersStepper()`) in tests; use fixtures           | error       |     |
+| [no-expect-in-tests](docs/rules/no-expect-in-tests.md)                           | No `expect` in tests; checks belong in steppers and asserters                          | error       |     |
+| [no-hard-waits](docs/rules/no-hard-waits.md)                                     | No `waitForTimeout` or `setTimeout` sleeps                                             | error       |     |
+| [no-nested-polling](docs/rules/no-nested-polling.md)                             | No poll inside a poll callback, also through calls into other files                    | error       |     |
+| [padding-lines](docs/rules/padding-lines.md)                                     | Blank lines after imports, around functions and object methods; none between overloads | warn        | 🔧  |
+| [step-placeholders](docs/rules/step-placeholders.md)                             | Validate `@step` description placeholders against the method parameters                | error       | 🔧  |
+| [step-required](docs/rules/step-required.md)                                     | Public methods of steppers, asserters and scenarios need `@step`                       | warn        |     |
 
 `@step` refers to [`@cerios/playwright-step-decorator`](https://github.com/CeriosTesting/playwright-step-decorator).
 

@@ -8,7 +8,7 @@ import path from "node:path";
  * rules stricter). Switching checks off is left to the linter config, where it stays visible.
  */
 
-export type Area = "api" | "database" | "mobile" | "ui";
+export type Area = "api" | "database" | "desktop" | "mobile" | "ui";
 
 /** A top-level SPARTA folder that aliases can point to. */
 export type TopFolder = "sparta" | "tests";
@@ -29,11 +29,15 @@ export const LAYER_FOLDERS = {
 	screens: { layer: "screen", suffix: "screen" },
 	services: { layer: "service", suffix: "service" },
 	steppers: { layer: "stepper", suffix: "stepper" },
+	windows: { layer: "window", suffix: "window" },
 } as const satisfies Record<string, { layer?: string; suffix?: string }>;
 
 export type LayerFolder = keyof typeof LAYER_FOLDERS;
 
-const AREAS: readonly Area[] = ["api", "database", "mobile", "ui"];
+/** Layer folders that live directly in an area (`sparta/<area>/builders/`), shared by its groups, not in a group. */
+export const AREA_LAYER_FOLDERS: ReadonlySet<LayerFolder> = new Set(["builders", "directors"]);
+
+const AREAS: readonly Area[] = ["api", "database", "desktop", "mobile", "ui"];
 
 /** Folders directly below the sparta folder that are not areas. */
 const TOP_LEVEL_FOLDERS = ["common", "fixtures", "scenarios", "support"];
@@ -79,7 +83,7 @@ export interface Conventions {
 	stepDecorators: ReadonlySet<string>;
 	expectNames: ReadonlySet<string>;
 	patterns: {
-		/** `/<sparta>/<area>/<group>[/<folder>]`. */
+		/** `/<sparta>/<area>[/<group>[/<folder>]]`. */
 		area: RegExp;
 		/** `/<sparta>/<area>/<group>/<folder>/`, capturing the folder. */
 		layer: RegExp;
@@ -307,14 +311,18 @@ function buildPatterns(
 	const tests = escape(testsFolder);
 	const areaNames = [...areas.keys()].map(escape).join("|");
 
+	// Folder names end at a `/` or at the end of the path, so an import of a folder itself (`@sparta/fixtures`,
+	// `@sparta/ui`, `../../tests`) is classified like the files in it.
+	const end = "(?=/|$)";
+
 	return {
-		area: new RegExp(`/${sparta}/(${areaNames})/([^/]+)(?:/([^/]+))?`),
+		area: new RegExp(`/${sparta}/(${areaNames})${end}(?:/([^/]+))?(?:/([^/]+))?`),
 		layer: new RegExp(`/${sparta}/(?:${areaNames})/[^/]+/([^/]+)/`),
-		top: new RegExp(`/${sparta}/(${TOP_LEVEL_FOLDERS.join("|")})/`),
+		top: new RegExp(`/${sparta}/(${TOP_LEVEL_FOLDERS.join("|")})${end}`),
 		checked: new RegExp(`/(?:${sparta}|${tests})/`),
 		sparta: new RegExp(`/${sparta}/`),
-		tests: new RegExp(`/${tests}/`),
-		framework: new RegExp(`/${tests}/framework/`),
+		tests: new RegExp(`/${tests}${end}`),
+		framework: new RegExp(`/${tests}/framework${end}`),
 	};
 }
 

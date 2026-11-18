@@ -1,8 +1,6 @@
-import path from "node:path";
-
 import { docsUrl } from "../utils/docs";
 import { conventionsFor, rootFor } from "../utils/settings";
-import { isLayerFile } from "../utils/sparta-paths";
+import { isDeclarationFile, isLayerFile, layerFolder, layerSuffix, moduleName } from "../utils/sparta-paths";
 import type { AstNode, NodeOfType, Rule } from "../utils/types";
 
 type Statement = NodeOfType<"Program">["body"][number];
@@ -36,19 +34,31 @@ const rule: Rule = {
 		messages: {
 			name: "Class '{{found}}' must be named '{{expected}}' to match the file name.",
 			single: "A layer file contains exactly one class; move '{{found}}' to its own file.",
+			missing: "A layer file contains exactly one class; expected a class named '{{expected}}'.",
 		},
 	},
 
 	create(context) {
 		const conventions = conventionsFor(context);
+		const root = rootFor(context, conventions);
+		const { filename } = context;
 
-		if (!isLayerFile(context.filename, conventions, rootFor(context, conventions))) return {};
+		if (isDeclarationFile(filename) || !isLayerFile(filename, conventions, root)) return {};
 
-		const expected = toPascalCase(path.basename(context.filename).replace(/\.ts$/, ""));
+		const module = moduleName(filename);
+		const expected = toPascalCase(module);
+		// Files in a layer folder must hold their class; fixtures and barrels (`index.ts`) may hold none.
+		const requiresClass = module !== "index" && layerSuffix(layerFolder(filename, conventions, root)) !== undefined;
 
 		return {
 			Program(program): void {
 				const classes = program.body.map(classOf).filter((node): node is ClassDeclaration => node !== undefined);
+
+				if (classes.length === 0 && requiresClass) {
+					context.report({ node: program, messageId: "missing", data: { expected } });
+
+					return;
+				}
 
 				classes.forEach((node, index) => {
 					const found = node.id?.name ?? "(anonymous)";

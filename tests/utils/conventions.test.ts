@@ -21,7 +21,7 @@ describe("parseSettings", () => {
 			expect(conventions.root).toBeUndefined();
 			expect(conventions.spartaFolder).toBe("sparta");
 			expect(conventions.testsFolder).toBe("tests");
-			expect([...conventions.areas.keys()]).toEqual(["api", "database", "mobile", "ui"]);
+			expect([...conventions.areas.keys()]).toEqual(["api", "database", "desktop", "mobile", "ui"]);
 			expect(conventions.aliases).toEqual([
 				["@sparta/", "sparta"],
 				["@tests/", "tests"],
@@ -123,7 +123,7 @@ describe("parseSettings validation", () => {
 
 	it("only maps onto standard concepts, suggesting the closest one", () => {
 		expect(errorOf({ areas: { web: "frontend" } })).toContain(
-			'settings.sparta.areas.web: unknown area "frontend". Use one of: api, database, mobile, ui.'
+			'settings.sparta.areas.web: unknown area "frontend". Use one of: api, database, desktop, mobile, ui.'
 		);
 		expect(errorOf({ layers: { "page-objects": "pagez" } })).toContain(
 			'settings.sparta.layers.page-objects: unknown layer folder "pagez"; did you mean "pages"?'

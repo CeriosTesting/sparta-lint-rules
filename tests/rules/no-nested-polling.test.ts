@@ -104,6 +104,97 @@ await expect.poll(() => getStatus()).toBe("done");`,
 	],
 	invalid: [
 		{
+			name: "a typed method parameter is followed",
+			code: `class Waiter {
+	async ready(): Promise<void> {
+		await expect.poll(() => 1).toBe(1);
+	}
+}
+
+class OrdersAsserter {
+	async check(waiter: Waiter): Promise<void> {
+		await expect(async () => {
+			await waiter.ready();
+		}).toPass();
+	}
+}`,
+			errors: [
+				{
+					messageId: "nestedCall",
+					data: {
+						call: "waiter.ready()",
+						outer: "toPass",
+						path: "Waiter.ready → poll (fixture-project/src/example.ts)",
+					},
+				},
+			],
+		},
+		{
+			name: "a typed parameter of the poll callback's enclosing arrow function is followed",
+			code: `class Waiter {
+	async ready(): Promise<void> {
+		await expect.poll(() => 1).toBe(1);
+	}
+}
+
+export const check = async (waiter: Waiter = new Waiter()): Promise<void> => {
+	await expect(async () => {
+		await waiter.ready();
+	}).toPass();
+};`,
+			errors: [{ messageId: "nestedCall" }],
+		},
+		{
+			name: "an arrow-function class property is followed like a method",
+			code: `class OrdersAsserter {
+	private readonly waitUntilReady = async (): Promise<void> => {
+		await expect.poll(() => 1).toBe(1);
+	};
+
+	async check(): Promise<void> {
+		await expect(async () => {
+			await this.waitUntilReady();
+		}).toPass();
+	}
+}`,
+			errors: [
+				{
+					messageId: "nestedCall",
+					data: {
+						call: "this.waitUntilReady()",
+						outer: "toPass",
+						path: "OrdersAsserter.waitUntilReady → poll (fixture-project/src/example.ts)",
+					},
+				},
+			],
+		},
+		{
+			name: "a static method call on a class is followed",
+			code: `class Waiter {
+	static async until(): Promise<void> {
+		await expect.poll(() => 1).toBe(1);
+	}
+}
+
+class OrdersAsserter {
+	async check(): Promise<void> {
+		await expect(async () => {
+			await Waiter.until();
+		}).toPass();
+	}
+}`,
+			errors: [
+				{
+					messageId: "nestedCall",
+					data: {
+						call: "Waiter.until()",
+						outer: "toPass",
+						path: "Waiter.until → poll (fixture-project/src/example.ts)",
+					},
+				},
+			],
+		},
+		{
 			name: "a method only reached through recursion is not remembered as non-polling",
 			code: `class Recursive {
 	async a(): Promise<void> {

@@ -10,9 +10,9 @@ Validate the placeholders in `@step` descriptions against the method parameters.
 
 For [`@cerios/playwright-step-decorator`](https://github.com/CeriosTesting/playwright-step-decorator) descriptions written as a string literal (or a template literal without expressions):
 
-- `{{name}}` and `{{name.path}}` must refer to a parameter of the method. `@step` reads the name exactly as written, so `{{ name }}` and `{{}}` fail at runtime and are reported. When the name without spaces is a parameter, the autofix removes the spaces.
+- `{{name}}` and `{{name.path}}` must refer to a parameter of the method, or to the instance as `{{this.path}}`. `@step` reads the name exactly as written, so `{{ name }}` and `{{}}` fail at runtime and are reported. When the name without spaces is a parameter, the autofix removes the spaces.
 - `[[index]]` must be smaller than the number of parameters (unless the method has a rest parameter).
-- `{name}` is printed literally, so it is reported. When `name` is a parameter, the autofix turns it into `{{name}}`.
+- `{name}` is printed literally, so it is reported. When `name` is a parameter (or starts with `this.`), the autofix turns it into `{{name}}`.
 - `@step` must be the decorator directly above the method; otherwise the placeholders cannot be resolved.
 
 Applies to all files.

@@ -26,14 +26,15 @@ Inside that callback it reports:
 
 Lint rules get no type information, so the rule follows calls using the SPARTA conventions and reads the other files from disk:
 
-- `this.method()`, including private methods and methods inherited through `extends`
+- `this.method()`, including private methods, arrow-function properties (`private waitUntilReady = async () => {…}`) and methods inherited through `extends`
 - `this.field.method()` and longer chains (`this.page.table.method()`). A field's class comes from a typed constructor parameter property (`constructor(private readonly page: OrdersPage)`), a typed field, a getter's return type, or `new X()` assigned to the field.
-- local variables created with `new X()` or typed as `X`, and `new X().method()`
+- local variables created with `new X()` or typed as `X`, parameters typed as `X` (or defaulting to `new X()`), and `new X().method()`
+- static methods called on a class (`Waiter.until()`)
 - functions declared in the file or imported
-- imports that are relative or use the `@sparta/*` and `@tests/*` aliases (resolved against the [project root](../../README.md#project-root)), including named re-exports and `export *`. Classes are resolved through their import path, so classes with the same name in different folders are told apart.
+- imports that are relative, use the `@sparta/*` and `@tests/*` aliases or go through tsconfig `paths` and `baseUrl` (see [import resolution](../../README.md#import-resolution)), including named re-exports and `export *`. Classes are resolved through their import path, so classes with the same name in different folders are told apart.
 - a callback passed by reference (`expect.poll(this.fetchStatus)`) counts as the referenced method's body
 
-Package imports (such as `@playwright/test`), dependencies passed as method parameters, objects created inside callbacks such as `.map()`, interfaces and dynamic member access are not followed. Whatever can't be resolved is skipped, so the rule doesn't guess.
+Package imports (such as `@playwright/test`), untyped parameters, `super.method()`, namespace imports (`import * as x`), objects created inside callbacks such as `.map()`, interfaces and dynamic member access are not followed. Whatever can't be resolved is skipped, so the rule doesn't guess.
 
 ## Settings
 

@@ -13,6 +13,10 @@ runRule("step-placeholders", rule, {
 		},
 		inClass(`@step("Open order {{orderId}}") async open(orderId: string) {}`),
 		inClass(`@step("Open order {{order.id}}") async open(order: Order) {}`),
+		{
+			name: "{{this.x}} reads a property of the instance",
+			code: inClass(`@step("Open {{this.name}} for {{orderId}}") async open(orderId: string) {}`),
+		},
 		inClass(`@step("Open [[0]]") async open(orderId: string, count = 1) {}`),
 		inClass(`@step("Open [[3]]") async open(...ids: string[]) {}`),
 		inClass(`@step(\`Open {{orderId}}\`) async open(orderId: string) {}`),
@@ -53,6 +57,28 @@ runRule("step-placeholders", rule, {
 			code: inClass(`@step("Open {orderId}") async open(orderId: string) {}`),
 			output: inClass(`@step("Open {{orderId}}") async open(orderId: string) {}`),
 			errors: [{ messageId: "singleBraces", data: { found: "{orderId}", expected: "{{orderId}}" } }],
+		},
+		{
+			name: "single braces around this.x are fixed like a parameter",
+			code: inClass(`@step("Open {this.name}") async open() {}`),
+			output: inClass(`@step("Open {{this.name}}") async open() {}`),
+			errors: [{ messageId: "singleBraces", data: { found: "{this.name}", expected: "{{this.name}}" } }],
+		},
+		{
+			name: "spaces around this.x are fixed",
+			code: inClass(`@step("Open {{ this.name }}") async open() {}`),
+			output: inClass(`@step("Open {{this.name}}") async open() {}`),
+			errors: [{ messageId: "whitespace" }],
+		},
+		{
+			name: "adjacent single-brace placeholders are both reported",
+			code: inClass(`@step("Open {orderId}{suffix}") async open(orderId: string, suffix: string) {}`),
+			// Touching fixes are applied one per pass; the linter's next pass fixes `{suffix}`.
+			output: inClass(`@step("Open {{orderId}}{suffix}") async open(orderId: string, suffix: string) {}`),
+			errors: [
+				{ messageId: "singleBraces", data: { found: "{orderId}", expected: "{{orderId}}" } },
+				{ messageId: "singleBraces", data: { found: "{suffix}", expected: "{{suffix}}" } },
+			],
 		},
 		{
 			name: "no autofix when the single-brace name is not a parameter",

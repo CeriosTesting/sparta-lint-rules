@@ -16,7 +16,7 @@ import type {
 
 import type { Conventions } from "./conventions";
 import { memberName, pollingMethod } from "./polling";
-import { normalize, resolveImport } from "./sparta-paths";
+import { moduleFile, resolveImport } from "./sparta-paths";
 
 /**
  * Follows calls across files without type information, using the conventions SPARTA projects follow:
@@ -81,8 +81,6 @@ const MAX_DEPTH = 10;
 
 const SKIPPED_KEYS = new Set(["parent", "loc", "range", "start", "end", "typeAnnotation", "returnType", "decorators"]);
 
-const MODULE_EXTENSIONS = ["", ".ts", ".tsx", ".mts", ".cts", "/index.ts"];
-
 const isNode = (value: unknown): value is Node =>
 	typeof value === "object" && value !== null && typeof (value as { type?: unknown }).type === "string";
 
@@ -141,12 +139,21 @@ function summarizeClass(name: string, node: Class): ClassInfo {
 	return info;
 }
 
-/** A typed field (`x: X`) or a field created with `new X()`. */
+/** A typed field (`x: X`), a field created with `new X()`, or a function-valued field, which acts as a method. */
 function summarizeField(info: ClassInfo, member: PropertyDefinition): void {
 	const field = member.computed ? undefined : keyName(member.key);
+
+	if (field === undefined) return;
+
+	if (isFunctionLike(member.value)) {
+		info.methods.set(field, member.value);
+
+		return;
+	}
+
 	const type = typeName(member.typeAnnotation) ?? newName(member.value);
 
-	if (field !== undefined && type !== undefined) info.fields.set(field, type);
+	if (type !== undefined) info.fields.set(field, type);
 }
 
 /** Methods, getters (whose return type acts as a field type) and the constructor. */
@@ -284,9 +291,7 @@ function summarizeNamedExport(
 	}
 }
 
-const isFile = (file: string): boolean => statSync(file, { throwIfNoEntry: false })?.isFile() ?? false;
-
-/** Resolves a relative or aliased import to a TypeScript file. Package imports resolve to `undefined`. */
+/** Resolves a relative, aliased or tsconfig-mapped import to a TypeScript file. Package imports resolve to `undefined`. */
 export function resolveModule(
 	fromFile: string,
 	request: string,
@@ -295,15 +300,7 @@ export function resolveModule(
 ): string | undefined {
 	const base = resolveImport(fromFile, request, root, conventions);
 
-	if (base === undefined) return undefined;
-
-	const stripped = base.replace(/\.(?:m|c)?js$/, "");
-
-	for (const candidate of [base, ...MODULE_EXTENSIONS.map(extension => `${stripped}${extension}`)]) {
-		if (isFile(candidate)) return normalize(candidate);
-	}
-
-	return undefined;
+	return base === undefined ? undefined : moduleFile(base);
 }
 
 /**
@@ -473,7 +470,8 @@ export class ProjectIndex {
 			case "Identifier": {
 				const type = scope.locals.get(node.name);
 
-				return type === undefined ? undefined : this.resolveClass(scope.file, type);
+				// Without a known local, the name may be a class itself, as in a static call (`Waiter.until()`).
+				return this.resolveClass(scope.file, type ?? node.name);
 			}
 			case "NewExpression":
 				return node.callee.type === "Identifier" ? this.resolveClass(scope.file, node.callee.name) : undefined;
@@ -567,13 +565,39 @@ export class ProjectIndex {
 	}
 }
 
-/** Local variables whose class is known: `const x = new X()` and `const x: X = ...`. */
+/** `x` and `X` for a parameter `x: X` or `x = new X()`. Parameter properties are fields, not locals. */
+function typedParameter(param: Node): [name: string, type: string] | undefined {
+	const binding = param.type === "AssignmentPattern" ? param.left : param;
+
+	if (binding.type !== "Identifier") return undefined;
+
+	const type =
+		typeName(binding.typeAnnotation) ?? (param.type === "AssignmentPattern" ? newName(param.right) : undefined);
+
+	return type === undefined ? undefined : [binding.name, type];
+}
+
+/**
+ * Locals whose class is known: typed parameters of `fn` and the functions inside it, `const x = new X()` and
+ * `const x: X = ...`.
+ */
 function collectLocals(fn: FunctionLike): Map<string, string> {
 	const locals = new Map<string, string>();
+
+	const addParameters = (node: FunctionLike): void => {
+		for (const param of node.params) {
+			const found = typedParameter(param);
+
+			if (found) locals.set(...found);
+		}
+	};
+
+	addParameters(fn);
 
 	if (!fn.body) return locals;
 
 	walk(fn.body, node => {
+		if (isFunctionLike(node)) addParameters(node);
 		if (node.type !== "VariableDeclarator" || node.id.type !== "Identifier") return;
 
 		const type = typeName(node.id.typeAnnotation) ?? newName(node.init);

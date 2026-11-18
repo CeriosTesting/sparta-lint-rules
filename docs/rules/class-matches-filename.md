@@ -8,10 +8,12 @@ Require a layer file to contain exactly one class, named after the file in Pasca
 
 ## Rule details
 
-Applies to files in layer folders (`steppers/`, `asserters/`, `clients/`, `services/`, `pages/`, `screens/`, `components/`, `repositories/`, `builders/`, `directors/`, `factories/`, `scenarios/`), to `sparta/scenarios/` and to `sparta/fixtures/`.
+Applies to files in layer folders (`steppers/`, `asserters/`, `clients/`, `services/`, `pages/`, `screens/`, `windows/`, `components/`, `repositories/`, `builders/`, `directors/`, `factories/`, `scenarios/`), to `sparta/scenarios/` and to `sparta/fixtures/`.
 
-- The first top-level class must be named after the file: `orders-stepper.ts` → `OrdersStepper`.
+- The first top-level class must be named after the file: `orders-stepper.ts` → `OrdersStepper` (also for `.mts` and `.cts`).
+- A file in a layer folder without any top-level class is reported. Fixtures and `index.ts` barrels may contain no class.
 - Any further top-level class is reported; move it to its own file.
+- Declaration files (`*.d.ts`) are not checked.
 
 ## Settings
 

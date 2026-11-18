@@ -8,6 +8,7 @@ type ObjectMember = NodeOfType<"ObjectExpression">["properties"][number];
 type MessageId = "afterImports" | "aroundFunctions" | "betweenObjectMethods";
 
 const BLANK_LINE = /\r?\n[\t ]*\r?\n/;
+const BLANK_LINES = /(\r?\n)(?:[\t ]*\r?\n)+/g;
 
 const unwrapExport = (node: Statement): AstNode =>
 	(node.type === "ExportNamedDeclaration" || node.type === "ExportDefaultDeclaration") && node.declaration
@@ -53,14 +54,21 @@ const isOverloadPair = (previous: Statement, current: Statement): boolean => {
 	);
 };
 
+/**
+ * A multi-line method, getter, setter or property holding a function. Single-line ones need no blank lines,
+ * as in `lines-between-class-members`.
+ */
 const isMethodProperty = (property: ObjectMember): boolean =>
-	property.type === "Property" && (property.method || property.kind !== "init" || isFunctionValue(property.value));
+	property.type === "Property" &&
+	property.loc.start.line !== property.loc.end.line &&
+	(property.method || property.kind !== "init" || isFunctionValue(property.value));
 
 const rule: Rule = {
 	meta: {
 		type: "layout",
 		docs: {
-			description: "Require blank lines after imports, around top-level functions and around object methods.",
+			description:
+				"Require blank lines after imports, around top-level functions and around object methods, and disallow blank lines between function overloads.",
 			url: docsUrl("padding-lines"),
 		},
 		fixable: "whitespace",
@@ -69,6 +77,7 @@ const rule: Rule = {
 			afterImports: "Expected a blank line after the import declarations.",
 			aroundFunctions: "Expected a blank line between a function and the adjacent statement.",
 			betweenObjectMethods: "Expected a blank line around methods in an object literal.",
+			betweenOverloads: "Unexpected blank line between overloads of the same function.",
 		},
 	},
 
@@ -97,6 +106,20 @@ const rule: Rule = {
 			});
 		};
 
+		/** Overload signatures and the implementation form one group without blank lines; comments are kept. */
+		const forbidBlankLines = (previous: AstNode, current: AstNode): void => {
+			const textBetween = text.slice(previous.range[1], current.range[0]);
+
+			if (!BLANK_LINE.test(textBetween)) return;
+
+			context.report({
+				node: current,
+				messageId: "betweenOverloads",
+				fix: fixer =>
+					fixer.replaceTextRange([previous.range[1], current.range[0]], textBetween.replace(BLANK_LINES, "$1")),
+			});
+		};
+
 		const checkStatements = (statements: readonly Statement[]): void => {
 			for (let index = 1; index < statements.length; index++) {
 				const previous = statements[index - 1];
@@ -104,10 +127,9 @@ const rule: Rule = {
 
 				if (isImport(previous) && !isImport(current)) {
 					requireBlankLine(previous, current, "afterImports");
-				} else if (
-					(isFunctionStatement(previous) || isFunctionStatement(current)) &&
-					!isOverloadPair(previous, current)
-				) {
+				} else if (isOverloadPair(previous, current)) {
+					forbidBlankLines(previous, current);
+				} else if (isFunctionStatement(previous) || isFunctionStatement(current)) {
 					requireBlankLine(previous, current, "aroundFunctions");
 				}
 			}
