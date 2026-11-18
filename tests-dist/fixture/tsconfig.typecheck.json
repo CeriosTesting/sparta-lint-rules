@@ -1,0 +1,14 @@
+{
+	// Used by `npm run test:dist`: type-checks the config files against the built package in ./node_modules.
+	"compilerOptions": {
+		"target": "es2023",
+		"module": "preserve",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"skipLibCheck": false,
+		"esModuleInterop": true,
+		"noEmit": true,
+		"types": []
+	},
+	"files": ["recommended.oxlint.config.ts", "typed.oxlint.config.ts", "typed.eslint.config.ts"]
+}

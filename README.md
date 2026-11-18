@@ -46,6 +46,7 @@ Register the plugin with `jsPlugins` and enable the rules you want:
 
 ```json
 {
+	"$schema": "./node_modules/@cerios/sparta-lint-rules/oxlintrc.schema.json",
 	"jsPlugins": ["@cerios/sparta-lint-rules"],
 	"rules": {
 		"sparta/architecture-boundaries": "error",
@@ -69,12 +70,25 @@ Register the plugin with `jsPlugins` and enable the rules you want:
 ### ESLint (flat config)
 
 ```js
-import sparta from "@cerios/sparta-lint-rules";
 // eslint.config.mjs
+import sparta from "@cerios/sparta-lint-rules";
 import tsParser from "@typescript-eslint/parser";
+import { defineConfig } from "eslint/config";
 
-export default [{ files: ["**/*.ts"], languageOptions: { parser: tsParser } }, sparta.configs.recommended];
+export default defineConfig({ files: ["**/*.ts"], languageOptions: { parser: tsParser } }, sparta.configs.recommended);
 ```
+
+### Editor autocompletion
+
+Your editor suggests the sparta rules and the [`settings.sparta`](#configuration) keys and values, and flags wrong values, while you write the config:
+
+| Config file                 | Rule names | `settings.sparta` | How                                                                                       |
+| --------------------------- | ---------- | ----------------- | ----------------------------------------------------------------------------------------- |
+| `oxlint.config.ts`          | ✅         | ✅                | Works once you import `@cerios/sparta-lint-rules/oxlint` and use oxlint's `defineConfig`. |
+| `.oxlintrc.json`            | ✅         | ✅                | Point `$schema` at `./node_modules/@cerios/sparta-lint-rules/oxlintrc.schema.json`.       |
+| `eslint.config.(m)js / .ts` |            | ✅                | Works once you import the plugin and use `defineConfig` from `eslint/config`.             |
+
+`oxlintrc.schema.json` extends oxlint's own `configuration_schema.json`, so oxlint's options keep their completion too. It expects `oxlint` in the same `node_modules` folder. Without `defineConfig`, annotate the ESLint config with `/** @type {import("eslint").Linter.Config[]} */`. ESLint has no way for a plugin to add rule names to its types without making every rules object in your project list them, so those aren't completed there.
 
 ---
 
@@ -146,7 +160,6 @@ A name can't turn one SPARTA concept into another, so `areas: { ui: "api" }`, `a
 
 ```ts
 import sparta from "@cerios/sparta-lint-rules/oxlint";
-import type { SpartaSettings } from "@cerios/sparta-lint-rules/settings";
 import { defineConfig } from "oxlint";
 
 export default defineConfig({
@@ -157,7 +170,7 @@ export default defineConfig({
 			layers: { "page-objects": "pages" },
 			aliases: { "@app/*": "sparta" },
 			supportModule: "@app/support",
-		} satisfies SpartaSettings,
+		},
 	},
 });
 ```
@@ -166,6 +179,7 @@ export default defineConfig({
 
 ```json
 {
+	"$schema": "./node_modules/@cerios/sparta-lint-rules/oxlintrc.schema.json",
 	"jsPlugins": ["@cerios/sparta-lint-rules"],
 	"settings": {
 		"sparta": { "areas": { "web": "ui" } }
@@ -176,11 +190,11 @@ export default defineConfig({
 ### ESLint (flat config)
 
 ```js
-export default [
+export default defineConfig(
 	// ...
 	sparta.configs.recommended,
-	{ settings: { sparta: { areas: { web: "ui" } } } },
-];
+	{ settings: { sparta: { areas: { web: "ui" } } } }
+);
 ```
 
 ### Project root

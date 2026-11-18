@@ -9,7 +9,7 @@
 	"printWidth": 120,
 	"bracketSpacing": true,
 	"arrowParens": "avoid",
-	"ignorePatterns": [".husky", "**/dist", "**/node_modules", "temp", "CHANGELOG.md"],
+	"ignorePatterns": [".husky", "**/dist", "**/node_modules", "temp", "CHANGELOG.md", "oxlintrc.schema.json"],
 	"experimentalSortImports": {
 		"groups": [
 			["side_effect"],

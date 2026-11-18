@@ -8,6 +8,7 @@ import { ESLint } from "eslint";
 const ROOT = path.resolve(__dirname, "..");
 const FIXTURE = path.join(__dirname, "fixture");
 const OXLINT_BIN = path.join(ROOT, "node_modules/oxlint/bin/oxlint");
+const TSC_BIN = path.join(ROOT, "node_modules/typescript/bin/tsc");
 
 const EXPECTED = [
 	"sparta/architecture-boundaries sparta/api/orders/steppers/orders-stepper.ts",
@@ -82,6 +83,19 @@ describe("built package", () => {
 				"sparta/architecture-boundaries sparta/web/shop/pages/cart-page.ts",
 			].toSorted()
 		);
+	});
+
+	it("types the sparta rules and settings.sparta in oxlint and ESLint configs", () => {
+		let output = "";
+
+		try {
+			execFileSync(process.execPath, [TSC_BIN, "-p", "tsconfig.typecheck.json"], { cwd: FIXTURE, encoding: "utf8" });
+		} catch (error) {
+			output = (error as { stdout: string }).stdout;
+		}
+
+		// tsc also fails on an unused `@ts-expect-error`, so the wrong values in the typed configs must be caught.
+		expect(output).toBe("");
 	});
 
 	it("reports through ESLint with the recommended flat config", async () => {

@@ -1,6 +1,6 @@
 {
 	// Editor-only: the package is linked into ./node_modules just for `npm run test:dist`,
-	// so map the self-import to the sources to keep the config file resolvable in the IDE.
+	// so map the self-import to the sources to keep the config files resolvable in the IDE.
 	// The other fixture files are deliberately left out — they contain intentional violations.
 	"compilerOptions": {
 		"target": "es2023",
@@ -13,8 +13,11 @@
 		"paths": {
 			"@cerios/sparta-lint-rules/oxlint": ["../../src/oxlint.ts"],
 			"@cerios/sparta-lint-rules/settings": ["../../src/settings.ts"],
-			"@cerios/sparta-lint-rules": ["../../src/index.ts"]
+			"@cerios/sparta-lint-rules": ["../../src/index.ts"],
+			// ESLint's types use the CommonJS copy of `@eslint/core`. The built package reaches it through
+			// `index.d.cts`; the sources need this mapping so their `settings.sparta` augmentation lands there too.
+			"@eslint/core": ["../../node_modules/@eslint/core/dist/cjs/types.d.cts"]
 		}
 	},
-	"files": ["recommended.oxlint.config.ts"]
+	"files": ["recommended.oxlint.config.ts", "typed.oxlint.config.ts", "typed.eslint.config.ts"]
 }
