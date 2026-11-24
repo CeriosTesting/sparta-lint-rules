@@ -10,5 +10,5 @@
 		"noEmit": true,
 		"types": []
 	},
-	"files": ["recommended.oxlint.config.ts", "typed.oxlint.config.ts", "typed.eslint.config.ts"]
+	"files": ["recommended.oxlint.config.ts", "typed.oxlint.config.ts"]
 }

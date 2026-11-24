@@ -200,6 +200,48 @@ describe("builders and directors", () => {
 			group: "shop",
 			layer: "builder",
 		});
+		expect(classify("/p/sparta/api/salesforce/builders/brp/case-builder.ts", DEFAULT_CONVENTIONS, "/p")?.layer).toBe(
+			"builder"
+		);
+	});
+
+	it("keeps builders in an area's common folder classified as area common", () => {
+		expect(classify("/p/sparta/api/common/directors/order-director.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({
+			kind: "area-common",
+			area: "api",
+			areaFolder: "api",
+			group: "common",
+			layer: "director",
+		});
+	});
+
+	it("classifies the builders and directors folders of sparta/common as shared layers", () => {
+		expect(classify("/p/sparta/common/builders/person-builder.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({
+			kind: "shared",
+			layer: "builder",
+		});
+		expect(classify("/p/sparta/common/directors/person-director.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({
+			kind: "shared",
+			layer: "director",
+		});
+		expect(classify("/p/sparta/common/builders", DEFAULT_CONVENTIONS, "/p")?.layer).toBe("builder");
+		expect(classify("/p/sparta/common/helpers.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({ kind: "shared" });
+		expect(classify("/p/sparta/common/steppers/x-stepper.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({ kind: "shared" });
+		expect(classify("/p/sparta/support/builders/x-builder.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({ kind: "shared" });
+		expect(classify("/p/sparta/common/data-builders/x-builder.ts", DATA, "/p")?.layer).toBe("builder");
+	});
+
+	it("gives the builders and directors folders of sparta/common as layer folders", () => {
+		expect(layerFolder("/p/sparta/common/builders/people/person-builder.ts", DEFAULT_CONVENTIONS, "/p")).toEqual({
+			name: "builders",
+			standard: "builders",
+		});
+		expect(layerFolder("/p/sparta/common/data-builders/person-builder.ts", DATA, "/p")).toEqual({
+			name: "data-builders",
+			standard: "builders",
+		});
+		expect(layerFolder("/p/sparta/common/helpers.ts", DEFAULT_CONVENTIONS, "/p")).toBeUndefined();
+		expect(isLayerFile("/p/sparta/common/directors/person-director.ts", DEFAULT_CONVENTIONS, "/p")).toBe(true);
 	});
 });
 

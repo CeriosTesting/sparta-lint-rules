@@ -6,8 +6,10 @@ import type { SpartaSettings } from "./utils/conventions";
 
 /**
  * Adds `settings.sparta` to ESLint's config types, so `defineConfig()` from `eslint/config` autocompletes and checks
- * it as soon as the plugin is imported. The rule names are deliberately not added: ESLint's `RulesConfig` can only
- * take them as required properties, which would make every `Linter.RulesRecord` value in a project list them all.
+ * it as soon as the plugin is imported. Needs ESLint 10+: ESLint 9 types `settings` as a plain record.
+ *
+ * The rule names are deliberately not added: ESLint's `RulesConfig` can only take them as required properties, which
+ * would make every `Linter.RulesRecord` value in a project list them all.
  */
 declare module "@eslint/core" {
 	interface SettingsConfig {

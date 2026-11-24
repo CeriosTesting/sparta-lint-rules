@@ -3,7 +3,7 @@ import { isStaticClass, topLevelClasses } from "../utils/class-members";
 import type { Conventions } from "../utils/conventions";
 import { docsUrl } from "../utils/docs";
 import { conventionsFor, rootFor } from "../utils/settings";
-import { classify, layerFolder, moduleName, resolveImport } from "../utils/sparta-paths";
+import { classify, moduleName, resolveImport } from "../utils/sparta-paths";
 import type { Area, FileInfo, Kind } from "../utils/sparta-paths";
 import type { AstNode, Rule } from "../utils/types";
 
@@ -65,11 +65,14 @@ const FORBIDDEN_LAYERS: Record<Area, Record<string, Set<string>>> = {
 	ui: uiLayers("page"),
 };
 
-/** The layers of `sparta/<area>/builders/` and `sparta/<area>/directors/`. */
+/** The layers of the `builders/` and `directors/` folders, wherever they live. */
 const BUILDER_LAYERS = new Set(["builder", "director"]);
 
-/** The only group layers that may use their area's builders and directors. */
+/** The only layers, besides directors, that may use builders and directors. */
 const BUILDER_USERS = new Set(["scenario", "stepper", "asserter", "service"]);
+
+/** Whether a file is a builder or director: in a group, an area's `common/`, an area, or `sparta/common/`. */
+const isBuilderLayer = (info: FileInfo): boolean => info.layer !== undefined && BUILDER_LAYERS.has(info.layer);
 
 const DATABASE_ACCESS = ["repository", "base-repository", "service", "base-service", "container", "database"];
 
@@ -116,7 +119,7 @@ const describe = (info: FileInfo, { spartaFolder, testsFolder }: Conventions): s
 		"area-layer": `${info.areaFolder} ${info.layer}`,
 		"top-scenario": `${spartaFolder}/scenarios`,
 		fixture: `${spartaFolder}/fixtures`,
-		shared: `${spartaFolder}/common|support`,
+		shared: info.layer ? `${spartaFolder}/common ${info.layer}` : `${spartaFolder}/common|support`,
 		test: testsFolder,
 	})[info.kind];
 
@@ -150,21 +153,29 @@ function isolationViolation(source: FileInfo, target: FileInfo): boolean {
 
 /**
  * Whether `source` may not use the builder or director `target`: builders use no builders or directors, directors
- * only use builders, and in a group only scenarios, steppers, asserters and services may use them.
+ * only use builders, and otherwise only scenarios, steppers, asserters and services may use them. Fixtures,
+ * top-level scenarios and tests are left to the other checks. Which builders a file can see is up to isolation.
  */
 function builderViolation(source: FileInfo, target: FileInfo): boolean | undefined {
-	if (source.kind === "area-layer") return source.layer === "builder" || target.layer === "director";
-	if (source.kind === "group") return source.layer === undefined || !BUILDER_USERS.has(source.layer);
+	if (isBuilderLayer(source)) return source.layer === "builder" || target.layer === "director";
+	if (["group", "area-common", "shared"].includes(source.kind)) {
+		return source.layer === undefined || !BUILDER_USERS.has(source.layer);
+	}
 
 	return undefined;
 }
 
 function layerViolation(source: FileInfo, target: FileInfo): boolean {
-	if (!target.layer || !target.area) return false;
+	if (!target.layer) return false;
 
 	const builder = BUILDER_LAYERS.has(target.layer) ? builderViolation(source, target) : undefined;
 
 	if (builder !== undefined) return builder;
+
+	// Builders and directors may use services, and code outside the layer folders (models), but no other layer.
+	if (isBuilderLayer(source)) return target.layer !== "service";
+
+	if (!target.area) return false;
 
 	if (source.kind === "group" || source.kind === "area-common") {
 		if (!source.area || !source.layer) return false;
@@ -202,8 +213,6 @@ const rule: Rule = {
 			reexport: "Do not re-export {{target}} outside its layer; this bypasses the architecture boundaries.",
 			staticService:
 				"{{source}} is a static abstract class and must not depend on {{target}} ({{request}}); only a normal class may use services.",
-			placement:
-				"Builders and directors belong in '{{expected}}/', shared by the area's groups, not in a group folder.",
 		},
 	},
 
@@ -220,10 +229,11 @@ const rule: Rule = {
 
 		/** An `index.ts` barrel in `builders/` or `directors/` may import and re-export its own layer. */
 		const isOwnBarrel = (target: FileInfo): boolean =>
-			source.kind === "area-layer" &&
+			isBuilderLayer(source) &&
 			moduleName(filename) === "index" &&
-			target.kind === "area-layer" &&
+			target.kind === source.kind &&
 			target.areaFolder === source.areaFolder &&
+			target.group === source.group &&
 			target.layer === source.layer;
 
 		const check = (node: AstNode, request: string | undefined, reexport = false): void => {
@@ -240,7 +250,7 @@ const rule: Rule = {
 				context.report({ node, messageId: "isolation", data });
 			} else if (layerViolation(source, target)) {
 				context.report({ node, messageId: "layer", data });
-			} else if (source.kind === "area-layer" && target.layer === "service" && !isNormalClass) {
+			} else if (isBuilderLayer(source) && target.layer === "service" && !isNormalClass) {
 				context.report({ node, messageId: "staticService", data });
 			} else if (reexport && isForbiddenReexport(source, target)) {
 				context.report({ node, messageId: "reexport", data });
@@ -250,13 +260,6 @@ const rule: Rule = {
 		return {
 			Program(node): void {
 				isNormalClass = topLevelClasses(node).some(declaration => !isStaticClass(declaration));
-
-				if (source.kind === "group" && source.layer !== undefined && BUILDER_LAYERS.has(source.layer)) {
-					const folder = layerFolder(filename, conventions, root)?.name ?? `${source.layer}s`;
-					const expected = `${conventions.spartaFolder}/${source.areaFolder}/${folder}`;
-
-					context.report({ node, messageId: "placement", data: { expected } });
-				}
 			},
 
 			ImportDeclaration: node => check(node, stringValue(node.source)),

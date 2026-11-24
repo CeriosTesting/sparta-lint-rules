@@ -86,9 +86,25 @@ Your editor suggests the sparta rules and the [`settings.sparta`](#configuration
 | --------------------------- | ---------- | ----------------- | ----------------------------------------------------------------------------------------- |
 | `oxlint.config.ts`          | ✅         | ✅                | Works once you import `@cerios/sparta-lint-rules/oxlint` and use oxlint's `defineConfig`. |
 | `.oxlintrc.json`            | ✅         | ✅                | Point `$schema` at `./node_modules/@cerios/sparta-lint-rules/oxlintrc.schema.json`.       |
-| `eslint.config.(m)js / .ts` |            | ✅                | Works once you import the plugin and use `defineConfig` from `eslint/config`.             |
+| `eslint.config.(m)js / .ts` |            | ✅ (ESLint 10+)   | Works once you import the plugin and use `defineConfig` from `eslint/config`.             |
 
-`oxlintrc.schema.json` extends oxlint's own `configuration_schema.json`, so oxlint's options keep their completion too. It expects `oxlint` in the same `node_modules` folder. Without `defineConfig`, annotate the ESLint config with `/** @type {import("eslint").Linter.Config[]} */`. ESLint has no way for a plugin to add rule names to its types without making every rules object in your project list them, so those aren't completed there.
+`oxlintrc.schema.json` extends oxlint's own `configuration_schema.json`, so oxlint's options keep their completion too. It expects `oxlint` in the same `node_modules` folder. Without `defineConfig`, annotate the ESLint config with `/** @type {import("eslint").Linter.Config[]} */`. ESLint 9 types `settings` as a plain record that a plugin can't extend; there, add `satisfies SpartaSettings` (from `@cerios/sparta-lint-rules/settings`) to `settings.sparta` in a TypeScript config. ESLint has no way for a plugin to add rule names to its types without making every rules object in your project list them, so those aren't completed there.
+
+#### Combining with other schemas
+
+`$schema` takes a single schema. To also use another plugin's schema, or your own, add a schema to your project that combines them with `allOf`, and point `$schema` at it:
+
+```json
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"allOf": [
+		{ "$ref": "../node_modules/@cerios/sparta-lint-rules/oxlintrc.schema.json" },
+		{ "$ref": "../node_modules/other-oxlint-plugin/oxlintrc.schema.json" }
+	]
+}
+```
+
+Each `$ref` is relative to the file it's written in. This example is `schemas/oxlintrc.json`, so `.oxlintrc.json` uses `"$schema": "./schemas/oxlintrc.json"`. A value must match every schema in `allOf`. This schema only describes the `sparta/*` rules and `settings.sparta`, so it accepts the rules and settings of other plugins.
 
 ---
 
@@ -100,7 +116,7 @@ The rules recognise files by their path, so they rely on the SPARTA folder conve
 <project>/
 ├── sparta/
 │   ├── api/                      # area: api, database, ui, mobile or desktop
-│   │   ├── common/               # shared within the area
+│   │   ├── common/               # shared within the area; may hold builders/ and directors/
 │   │   ├── builders/             # *-builder.ts, test data builders shared by the area's groups
 │   │   ├── directors/            # *-director.ts, compose several builders
 │   │   └── <group>/              # e.g. orders
@@ -108,14 +124,15 @@ The rules recognise files by their path, so they rely on the SPARTA folder conve
 │   │       ├── services/         # *-service.ts
 │   │       ├── steppers/         # *-stepper.ts
 │   │       ├── asserters/        # *-asserter.ts
-│   │       └── scenarios/        # *-scenario.ts
+│   │       ├── scenarios/        # *-scenario.ts
+│   │       └── builders/         # *-builder.ts (and directors/), private to the group
 │   ├── database/<group>/         # repositories/, services/, steppers/, asserters/, scenarios/, ...
 │   ├── ui/<group>/               # pages/, components/, steppers/, asserters/, scenarios/
 │   ├── mobile/<group>/           # like ui, with screens/ (*-screen.ts) in place of pages/
 │   ├── desktop/<group>/          # like ui, with windows/ (*-window.ts) in place of pages/, for Windows apps
 │   ├── scenarios/                # cross-area scenarios
 │   ├── fixtures/                 # Playwright fixtures that wire everything up
-│   ├── common/                   # shared, area-independent code
+│   ├── common/                   # shared, area-independent code; may hold builders/ and directors/
 │   └── support/                  # expect with custom matchers, helpers
 └── tests/                        # the tests themselves
     └── framework/                # framework tests; never checked

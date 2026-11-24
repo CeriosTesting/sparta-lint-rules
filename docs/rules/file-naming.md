@@ -24,7 +24,7 @@ Require files in a layer folder to be kebab-case and end with the layer suffix (
 | `steppers/`     | `*-stepper.ts`    |
 | `windows/`      | `*-window.ts`     |
 
-This applies to layer folders in `sparta/<area>/<group>/`, to `sparta/<area>/builders/` and `sparta/<area>/directors/`, and to `sparta/scenarios/`. Other folders (such as `models/`) are not checked.
+This applies to layer folders in `sparta/<area>/<group>/` and `sparta/<area>/common/`, to the `builders/` and `directors/` folders directly in an area (`sparta/<area>/builders/`) or in `sparta/common/`, and to `sparta/scenarios/`. Other folders (such as `models/`) are not checked.
 
 An `index.ts` barrel is allowed in a layer folder. [`architecture-boundaries`](architecture-boundaries.md) makes sure it only re-exports its own layer.
 

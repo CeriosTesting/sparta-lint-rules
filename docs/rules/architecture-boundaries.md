@@ -13,9 +13,9 @@ Every `import` (including `import type`), `export … from`, dynamic `import()`,
 ### Isolation
 
 - A group (`sparta/<area>/<group>/`) only depends on its own group, its area's `common/`, builders and directors, and `sparta/common` or `sparta/support`.
-- An area's builders and directors (`sparta/<area>/builders/`, `sparta/<area>/directors/`) only depend on their area's `common/`, builders and services, and `sparta/common` or `sparta/support`. See [builders and directors](#builders-and-directors).
-- An area's `common/` does not depend on groups, builders, directors, other areas' `common/`, fixtures or top-level scenarios.
-- `sparta/common` and `sparta/support` do not depend on groups, area commons, builders, directors, fixtures or top-level scenarios.
+- An area's builders and directors (`sparta/<area>/builders/`, `sparta/<area>/directors/`) only depend on their area's `common/`, builders and services, and `sparta/common` or `sparta/support`. Builders and directors can also live in a group, in an area's `common/` and in `sparta/common/`; see [builders and directors](#builders-and-directors).
+- An area's `common/` does not depend on groups, the area's builders and directors, other areas' `common/`, fixtures or top-level scenarios.
+- `sparta/common` and `sparta/support` do not depend on groups, area commons, area builders and directors, fixtures or top-level scenarios.
 - Nothing in `sparta/` depends on `tests/`.
 
 ### Layers
@@ -48,22 +48,24 @@ Files named `*-base-client.ts`, `*-base-service.ts` and `*-base-repository.ts` a
 
 ### Builders and directors
 
-Builders (`*-builder.ts`) and directors (`*-director.ts`) build test data. They live on their own, directly in an area, and are shared by all of that area's groups:
+Builders (`*-builder.ts`) and directors (`*-director.ts`) build test data. Put them at the level that matches who needs them; the level decides who can see them:
 
-```text
-sparta/<area>/builders/order-builder.ts
-sparta/<area>/directors/order-director.ts
-```
+| Level            | Folder                                                    | Visible to                     | Services they may use      |
+| ---------------- | --------------------------------------------------------- | ------------------------------ | -------------------------- |
+| Group            | `sparta/<area>/<group>/builders/`, `…/<group>/directors/` | that group only                | their own group's services |
+| Area common      | `sparta/<area>/common/builders/`, `…/common/directors/`   | everything in that area folder | none                       |
+| Area             | `sparta/<area>/builders/`, `sparta/<area>/directors/`     | the area's groups              | any group's in the area    |
+| Top-level common | `sparta/common/builders/`, `sparta/common/directors/`     | every area                     | none                       |
 
-This applies to every area: `api`, `database`, `ui`, `mobile`, `desktop` and custom areas.
+This applies to every area: `api`, `database`, `ui`, `mobile`, `desktop` and custom areas. Sub-folders are fine (`sparta/api/salesforce/builders/brp/case-builder.ts`).
 
-- **Who may use them:** only scenarios, steppers, asserters and services of the same area folder. Every other group file is reported, including clients, repositories, pages, screens, windows, components, base layers and files outside the layer folders. Builders of another area are an isolation error. Fixtures, top-level scenarios and tests may still use them.
+- **Who may use them:** only scenarios, steppers, asserters and services (and directors, see below) that can see them. Every other file is reported, including clients, repositories, pages, screens, windows, components, base layers and files outside the layer folders, such as `models/` or `sparta/common/helpers.ts`. Builders out of sight are an isolation error: another group's, another area's, and, for code in an area's `common/` or `sparta/common/`, the area-level ones. Fixtures, top-level scenarios and tests may use them.
 - **Builders** do not depend on other builders or on directors.
-- **Directors** only depend on builders of their own area, never on other directors. A director that uses a single builder belongs on that builder as a custom method; [`director-composes-builders`](director-composes-builders.md) reports that.
-- **Services:** a builder or director is either a static abstract class (`abstract`, with only `static` members and at most a `private constructor`) or a normal class. Only a normal class may use the services (`services/*-service.ts`) of any group in its area. A static abstract class, or a file without a class, that imports a service is reported. No other group code may be used at all.
-- **Placement:** a `builders/` or `directors/` folder inside a group (`sparta/ui/shop/builders/`) is reported once per file, with the area folder it belongs in.
+- **Directors** only depend on builders they can see, never on other directors. A group's director may combine its group's builders with those of its area's `common/`, its area and `sparta/common/`. A director that uses a single builder belongs on that builder as a custom method; [`director-composes-builders`](director-composes-builders.md) reports that.
+- **Other dependencies:** besides builders, a builder or director may only use services and code outside the layer folders (models, helpers, packages) that it can see. Clients, steppers, pages, base layers and other layers are reported.
+- **Services:** a builder or director is either a static abstract class (`abstract`, with only `static` members and at most a `private constructor`) or a normal class. Only a normal class may use services. A static abstract class, or a file without a class, that imports a service is reported.
 
-Because `builders` and `directors` are area-level folders, a group can't be named `builders` or `directors`. An `index.ts` barrel in those folders may import and re-export its own layer.
+Because `builders` and `directors` are area-level folders, a group can't be named `builders` or `directors`. An `index.ts` barrel in a `builders/` or `directors/` folder may import and re-export its own layer.
 
 Orchestrating code may only use the higher layers:
 
@@ -121,6 +123,31 @@ import { OrdersService } from "@sparta/api/orders/services/orders-service";
 export abstract class OrderDirector {
 	static paidOrder() {}
 }
+```
+
+```ts
+// sparta/api/salesforce/builders/document-builder.ts
+
+// ✅ packages, the group's own models and (in a normal class) its own services
+import { CeriosAutoBuilder } from "@cerios/cerios-builder";
+import { Document } from "@sparta/api/salesforce/models/document";
+// ❌ builders don't use other builders, at any level
+import { PersonBuilder } from "@sparta/common/builders/person-builder";
+
+// ❌ only services: no clients, steppers, ...
+import { SalesforceClient } from "../clients/salesforce-client";
+
+export class DocumentBuilder extends CeriosAutoBuilder<Document>() {}
+```
+
+```ts
+// sparta/api/orders/steppers/orders-stepper.ts
+
+import { AddressBuilder } from "@sparta/api/common/builders/address-builder";
+// ❌ the salesforce group's builders are private to that group
+import { DocumentBuilder } from "@sparta/api/salesforce/builders/document-builder";
+// ✅ builders from sparta/common/ and from the area's common/
+import { PersonBuilder } from "@sparta/common/builders/person-builder";
 ```
 
 Files in `tests/framework/` are not checked.

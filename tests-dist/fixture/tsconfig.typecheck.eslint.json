@@ -1,0 +1,5 @@
+{
+	// Used by `npm run test:dist` on ESLint 10+, whose types let the plugin add `settings.sparta`.
+	"extends": "./tsconfig.typecheck.json",
+	"files": ["typed.eslint.config.ts"]
+}

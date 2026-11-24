@@ -107,7 +107,7 @@
 		"vitest": "^5.1.0"
 	},
 	"peerDependencies": {
-		"@eslint/core": ">=1.0.0",
+		"@eslint/core": "*",
 		"eslint": ">=9.0.0",
 		"oxlint": ">=1.91.0"
 	},

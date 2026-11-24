@@ -64,6 +64,18 @@ runRule("file-naming", rule, {
 			errors: [{ messageId: "suffix", data: { folder: "builders", suffix: "builder", name: "order.ts" } }],
 		},
 		{
+			name: "the builders folder of sparta/common",
+			code: CODE,
+			filename: file("sparta/common/builders/person.ts"),
+			errors: [{ messageId: "suffix", data: { folder: "builders", suffix: "builder", name: "person.ts" } }],
+		},
+		{
+			name: "the builders folder of a group",
+			code: CODE,
+			filename: file("sparta/api/salesforce/builders/brp/document.ts"),
+			errors: [{ messageId: "suffix", data: { folder: "builders", suffix: "builder", name: "document.ts" } }],
+		},
+		{
 			code: CODE,
 			filename: file("sparta/ui/directors/cartDirector.ts"),
 			errors: [

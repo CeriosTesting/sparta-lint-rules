@@ -25,7 +25,7 @@ const rule: Rule = {
 		const root = rootFor(context, conventions);
 		const source = classify(filename, conventions, root);
 
-		if (source?.kind !== "area-layer" || source.layer !== "director" || moduleName(filename) === "index") return {};
+		if (source?.layer !== "director" || moduleName(filename) === "index") return {};
 
 		const isBuilder = (request: string | undefined): boolean => {
 			if (request === undefined) return false;

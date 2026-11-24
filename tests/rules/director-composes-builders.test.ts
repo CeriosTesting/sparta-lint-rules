@@ -91,5 +91,23 @@ import { OrderBuilder as Builder } from "../builders";`,
 			settings: { sparta: { areas: { web: "ui" }, layers: { "data-directors": "directors" } } },
 			errors: [{ messageId: "singleBuilder", data: { builder: "CartBuilder" } }],
 		},
+		{
+			name: "a director in a group",
+			code: `import { DocumentBuilder } from "../builders/document-builder";`,
+			filename: file("sparta/api/salesforce/directors/document-director.ts"),
+			errors: [{ messageId: "singleBuilder", data: { builder: "DocumentBuilder" } }],
+		},
+		{
+			name: "a director in an area's common folder",
+			code: `import { OrderBuilder } from "../builders/order-builder";`,
+			filename: file("sparta/api/common/directors/order-director.ts"),
+			errors: [{ messageId: "singleBuilder" }],
+		},
+		{
+			name: "a director in sparta/common",
+			code: `import { PersonBuilder } from "@sparta/common/builders/person-builder";`,
+			filename: file("sparta/common/directors/person-director.ts"),
+			errors: [{ messageId: "singleBuilder" }],
+		},
 	],
 });

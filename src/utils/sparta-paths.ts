@@ -12,8 +12,9 @@ export type { Area } from "./conventions";
  *
  * - `sparta/{api,database,desktop,mobile,ui}/<group>/<layer folder>/` holds the layers of one group.
  * - `sparta/{api,database,desktop,mobile,ui}/common/` is shared within an area.
- * - `sparta/<area>/builders/` and `sparta/<area>/directors/` hold the area's builders and directors, which its
- *   groups share.
+ * - Builders (`builders/`) and directors (`directors/`) live in a group or an area's `common/` like any layer
+ *   folder, directly in an area (`sparta/<area>/builders/`, shared by its groups), or in `sparta/common/` (shared
+ *   by everything, classified as `shared` with a layer).
  * - `mobile` and `desktop` are structured like `ui`, with `screens/` and `windows/` in place of `pages/`.
  * - `sparta/scenarios/`, `sparta/fixtures/`, `sparta/common/` and `sparta/support/` are top level.
  * - `tests/` holds the tests, except `tests/framework/`, which is never checked.
@@ -53,15 +54,22 @@ export interface LayerFolderInfo {
 	standard?: LayerFolder;
 }
 
-/** The area-level layer folder (`builders/`, `directors/` directly below an area) a project path is in, if any. */
-const areaLayerFolder = (file: string, conventions: Conventions): LayerFolderInfo | undefined => {
-	const name = file.match(conventions.patterns.area)?.[2];
+/** `name` as a builders or directors folder (`AREA_LAYER_FOLDERS`), if it is one. */
+const builderFolder = (conventions: Conventions, name: string | undefined): LayerFolderInfo | undefined => {
 	const standard = standardFolder(conventions, name);
 
 	return name !== undefined && standard !== undefined && AREA_LAYER_FOLDERS.has(standard)
 		? { name, standard }
 		: undefined;
 };
+
+/** The area-level layer folder (`builders/`, `directors/` directly below an area) a project path is in, if any. */
+const areaLayerFolder = (file: string, conventions: Conventions): LayerFolderInfo | undefined =>
+	builderFolder(conventions, file.match(conventions.patterns.area)?.[2]);
+
+/** The `builders/` or `directors/` folder directly below `sparta/common/` a project path is in, if any. */
+const commonLayerFolder = (file: string, conventions: Conventions): LayerFolderInfo | undefined =>
+	builderFolder(conventions, file.match(conventions.patterns.common)?.[1]);
 
 const caseInsensitivePaths = process.platform === "win32";
 
@@ -116,7 +124,13 @@ export function classify(filename: string, conventions: Conventions, root: strin
 
 	const top = file.match(patterns.top)?.[1];
 
-	return top ? { kind: TOP_LEVEL_KINDS[top] ?? "shared" } : undefined;
+	if (top === undefined) return undefined;
+
+	const commonLayer = top === "common" ? commonLayerFolder(file, conventions) : undefined;
+
+	return commonLayer
+		? { kind: "shared", layer: layerOf(commonLayer.standard) }
+		: { kind: TOP_LEVEL_KINDS[top] ?? "shared" };
 }
 
 /** Project root per directory, kept for the lifetime of the linter process. */
@@ -224,7 +238,11 @@ export const layerFolder = (filename: string, conventions: Conventions, root: st
 	const file = projectPath(filename, root);
 
 	if (file === undefined) return undefined;
-	if (file.match(conventions.patterns.top)?.[1] === "scenarios") return { name: "scenarios", standard: "scenarios" };
+
+	const top = file.match(conventions.patterns.top)?.[1];
+
+	if (top === "scenarios") return { name: "scenarios", standard: "scenarios" };
+	if (top === "common") return commonLayerFolder(file, conventions);
 
 	const areaLayer = areaLayerFolder(file, conventions);
 
