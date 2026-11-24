@@ -1,6 +1,8 @@
-import type { Severity, rules } from "./rules";
+import type { RuleDefinition } from "@eslint/core";
 
-/** ESLint flat config entry. Typed structurally so the package does not depend on ESLint's types. */
+import type { RuleName, Severity } from "./rules";
+
+/** ESLint flat config entry. Typed structurally so it fits ESLint's `defineConfig()`. */
 export interface SpartaFlatConfig {
 	name: string;
 	plugins: Record<string, SpartaPlugin>;
@@ -9,7 +11,8 @@ export interface SpartaFlatConfig {
 
 export interface SpartaPlugin {
 	meta: { name: string; version: string };
-	rules: typeof rules;
+	/** Typed as ESLint rules for ESLint configs; oxlint loads the plugin by name and doesn't read these types. */
+	rules: Record<RuleName, RuleDefinition>;
 	configs: { recommended: SpartaFlatConfig };
 }
 

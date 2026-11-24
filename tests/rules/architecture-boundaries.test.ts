@@ -23,6 +23,13 @@ const ORDER_DIRECTOR = file("sparta/api/directors/order-director.ts");
 const API_BUILDER = `import { OrderBuilder } from "@sparta/api/builders/order-builder";`;
 const ORDERS_SERVICE_IMPORT = `import { OrdersService } from "@sparta/api/orders/services/orders-service";`;
 
+const DOCUMENT_BUILDER = file("sparta/api/salesforce/builders/document-builder.ts");
+const DOCUMENT_DIRECTOR = file("sparta/api/salesforce/directors/document-director.ts");
+const PERSON_BUILDER = file("sparta/common/builders/person-builder.ts");
+const PERSON_DIRECTOR = file("sparta/common/directors/person-director.ts");
+const COMMON_BUILDER = `import { PersonBuilder } from "@sparta/common/builders/person-builder";`;
+const AREA_COMMON_BUILDER = `import { AddressBuilder } from "@sparta/api/common/builders/address-builder";`;
+
 const CUSTOM = {
 	sparta: { areas: { web: "ui" }, layers: { "page-objects": "pages" }, aliases: { "@app/*": "sparta" } },
 } as const;
@@ -138,6 +145,102 @@ export default class OrderDirector {}`,
 			code: `import { UsersService } from "@sparta/database/users/services/users-service";
 export abstract class UserBuilder { build() {} }`,
 			filename: file("sparta/database/builders/user-builder.ts"),
+		},
+		{
+			name: "group builders: a builder uses a package, its group's models and a service",
+			code: `import { BuilderWith, CeriosAutoBuilder } from "@cerios/cerios-builder";
+import { Document } from "@sparta/api/salesforce/models/document";
+import { CasesService } from "../services/cases-service";
+export class DocumentBuilder extends CeriosAutoBuilder<Document>() {}`,
+			filename: DOCUMENT_BUILDER,
+		},
+		{
+			name: "group builders: a builder in a subfolder",
+			code: `import { Case } from "@sparta/api/salesforce/models/case";
+export class CaseBuilder {}`,
+			filename: file("sparta/api/salesforce/builders/brp/case-builder.ts"),
+		},
+		...[
+			"sparta/api/salesforce/steppers/cases-stepper.ts",
+			"sparta/api/salesforce/asserters/cases-asserter.ts",
+			"sparta/api/salesforce/scenarios/cases-scenario.ts",
+			"sparta/api/salesforce/services/cases-service.ts",
+		].map(path => ({
+			name: `group builders: ${path} uses its group's builder and director`,
+			code: `import { DocumentBuilder } from "@sparta/api/salesforce/builders/document-builder";
+import { DocumentDirector } from "../directors/document-director";`,
+			filename: file(path),
+		})),
+		{
+			name: "group builders: a director uses builders of its group, its area's common, its area and sparta/common",
+			code: `import { DocumentBuilder } from "../builders/document-builder";
+import { CaseBuilder } from "../builders/brp/case-builder";
+${AREA_COMMON_BUILDER}
+${API_BUILDER}
+${COMMON_BUILDER}`,
+			filename: DOCUMENT_DIRECTOR,
+		},
+		{
+			name: "group builders: a barrel re-exports its own builders",
+			code: `export * from "./document-builder";
+export * from "./brp";`,
+			filename: file("sparta/api/salesforce/builders/index.ts"),
+		},
+		{
+			name: "group builders: fixtures, top-level scenarios and tests use them",
+			code: `import { DocumentBuilder } from "@sparta/api/salesforce/builders/document-builder";`,
+			filename: file("sparta/fixtures/test-fixture.ts"),
+		},
+		{
+			code: `import { DocumentBuilder } from "@sparta/api/salesforce/builders/document-builder";`,
+			filename: file("sparta/scenarios/checkout-scenario.ts"),
+		},
+		{
+			code: `import { DocumentBuilder } from "@sparta/api/salesforce/builders/document-builder";`,
+			filename: SPEC,
+		},
+		{
+			name: "area common builders: groups and area directors use them",
+			code: AREA_COMMON_BUILDER,
+			filename: ORDERS_STEPPER,
+		},
+		{ code: AREA_COMMON_BUILDER, filename: ORDER_DIRECTOR },
+		{
+			name: "area common builders: a director in the area's common folder uses them",
+			code: `import { AddressBuilder } from "../builders/address-builder";
+import { OrderBuilder } from "../builders/order-builder";`,
+			filename: file("sparta/api/common/directors/order-director.ts"),
+		},
+		{
+			name: "area common builders: a builder uses area common models",
+			code: `import { Address } from "../models/address";
+export abstract class AddressBuilder { static create() {} }`,
+			filename: file("sparta/api/common/builders/address-builder.ts"),
+		},
+		{
+			name: "common builders: every area uses them",
+			code: COMMON_BUILDER,
+			filename: ORDERS_STEPPER,
+		},
+		{ code: COMMON_BUILDER, filename: LOGIN_STEPPER },
+		{ code: COMMON_BUILDER, filename: ORDER_DIRECTOR },
+		{ code: COMMON_BUILDER, filename: DOCUMENT_DIRECTOR },
+		{ code: COMMON_BUILDER, filename: SPEC },
+		{
+			name: "common builders: a director uses them, a builder uses shared code",
+			code: `${COMMON_BUILDER}
+import { AddressBuilder } from "../builders/address-builder";`,
+			filename: PERSON_DIRECTOR,
+		},
+		{
+			code: `import { Person } from "@sparta/common/models/person";
+import { expect } from "@sparta/support";`,
+			filename: PERSON_BUILDER,
+		},
+		{
+			name: "common builders: a barrel re-exports its own builders",
+			code: `export * from "./person-builder";`,
+			filename: file("sparta/common/builders/index.ts"),
 		},
 		{
 			name: "settings: a custom folder that follows builders",
@@ -598,16 +701,152 @@ export const buildOrder = () => ({});`,
 			errors: [{ messageId: "reexport" }],
 		},
 		{
-			name: "builders: a builder in a group folder",
-			code: `export class CartBuilder {}`,
-			filename: file("sparta/ui/shop/builders/cart-builder.ts"),
-			errors: [{ messageId: "placement", data: { expected: "sparta/ui/builders" } }],
+			name: "group builders: another group uses them",
+			code: `import { DocumentBuilder } from "@sparta/api/salesforce/builders/document-builder";`,
+			filename: ORDERS_STEPPER,
+			errors: [
+				{
+					messageId: "isolation",
+					data: {
+						source: "api/orders stepper",
+						target: "api/salesforce builder",
+						request: "@sparta/api/salesforce/builders/document-builder",
+					},
+				},
+			],
 		},
 		{
-			name: "builders: a director in a group folder",
-			code: `export class OrderDirector {}`,
-			filename: file("sparta/api/orders/directors/order-director.ts"),
-			errors: [{ messageId: "placement", data: { expected: "sparta/api/directors" } }],
+			name: "group builders: an area director uses them",
+			code: `import { DocumentBuilder } from "@sparta/api/salesforce/builders/document-builder";`,
+			filename: ORDER_DIRECTOR,
+			errors: [{ messageId: "isolation" }],
+		},
+		{
+			name: "group builders: area common code uses them",
+			code: `import { DocumentBuilder } from "@sparta/api/salesforce/builders/document-builder";`,
+			filename: file("sparta/api/common/directors/order-director.ts"),
+			errors: [{ messageId: "isolation" }],
+		},
+		{
+			name: "group builders: a builder uses its group's client, stepper or base service",
+			code: `import { SalesforceClient } from "../clients/salesforce-client";
+import { CasesStepper } from "../steppers/cases-stepper";
+import { CasesBaseService } from "../services/cases-base-service";
+export class DocumentBuilder {}`,
+			filename: DOCUMENT_BUILDER,
+			errors: [
+				{
+					messageId: "layer",
+					data: {
+						source: "api/salesforce builder",
+						target: "api/salesforce client",
+						request: "../clients/salesforce-client",
+					},
+				},
+				{ messageId: "layer" },
+				{ messageId: "layer" },
+			],
+		},
+		{
+			name: "group builders: a builder uses another builder",
+			code: `import { AccountBuilder } from "./account-builder";`,
+			filename: DOCUMENT_BUILDER,
+			errors: [{ messageId: "layer" }],
+		},
+		{
+			name: "group builders: a builder uses the area's builder",
+			code: API_BUILDER,
+			filename: DOCUMENT_BUILDER,
+			errors: [{ messageId: "layer" }],
+		},
+		{
+			name: "group builders: a director uses a director",
+			code: `import { AccountDirector } from "./account-director";
+import { OrderDirector } from "@sparta/api/directors/order-director";`,
+			filename: DOCUMENT_DIRECTOR,
+			errors: [{ messageId: "layer" }, { messageId: "layer" }],
+		},
+		{
+			name: "group builders: a page or a file outside the layer folders uses them",
+			code: `import { CartBuilder } from "../builders/cart-builder";`,
+			filename: file("sparta/ui/shop/pages/cart-page.ts"),
+			errors: [{ messageId: "layer" }],
+		},
+		{
+			code: `import { DocumentBuilder } from "../builders/document-builder";`,
+			filename: file("sparta/api/salesforce/models/document.ts"),
+			errors: [{ messageId: "layer" }],
+		},
+		{
+			name: "group builders: a static abstract builder uses its group's service",
+			code: `import { CasesService } from "../services/cases-service";
+export abstract class DocumentBuilder { static create() {} }`,
+			filename: DOCUMENT_BUILDER,
+			errors: [{ messageId: "staticService" }],
+		},
+		{
+			name: "area common builders: a builder uses a group service",
+			code: `${ORDERS_SERVICE_IMPORT}
+export class OrderBuilder {}`,
+			filename: file("sparta/api/common/builders/order-builder.ts"),
+			errors: [{ messageId: "isolation" }],
+		},
+		{
+			name: "area common builders: another area uses them",
+			code: `import { CartBuilder } from "@sparta/ui/common/builders/cart-builder";`,
+			filename: ORDERS_STEPPER,
+			errors: [{ messageId: "isolation" }],
+		},
+		{
+			name: "area common builders: area common code outside the builder users uses them",
+			code: `import { OrderBuilder } from "./builders/order-builder";`,
+			filename: file("sparta/api/common/http.ts"),
+			errors: [{ messageId: "layer" }],
+		},
+		{
+			name: "common builders: a director uses an area builder",
+			code: API_BUILDER,
+			filename: PERSON_DIRECTOR,
+			errors: [
+				{
+					messageId: "isolation",
+					data: {
+						source: "sparta/common director",
+						target: "api builder",
+						request: "@sparta/api/builders/order-builder",
+					},
+				},
+			],
+		},
+		{
+			name: "common builders: a builder uses a group service",
+			code: `${ORDERS_SERVICE_IMPORT}
+export class PersonBuilder {}`,
+			filename: PERSON_BUILDER,
+			errors: [{ messageId: "isolation" }],
+		},
+		{
+			name: "common builders: a builder uses another builder",
+			code: `import { AddressBuilder } from "./address-builder";`,
+			filename: PERSON_BUILDER,
+			errors: [
+				{
+					messageId: "layer",
+					data: { source: "sparta/common builder", target: "sparta/common builder", request: "./address-builder" },
+				},
+			],
+		},
+		{
+			name: "common builders: shared code outside the builder folders uses them",
+			code: COMMON_BUILDER,
+			filename: file("sparta/common/helpers.ts"),
+			errors: [{ messageId: "layer" }],
+		},
+		{
+			name: "common builders: a client uses them",
+			code: COMMON_BUILDER,
+			filename: file("sparta/api/orders/clients/orders-client.ts"),
+			errors: [{ messageId: "layer" }],
 		},
 		{
 			name: "tsconfig paths: a page depends on a stepper",

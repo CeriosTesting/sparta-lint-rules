@@ -34,10 +34,14 @@ export const LAYER_FOLDERS = {
 
 export type LayerFolder = keyof typeof LAYER_FOLDERS;
 
-/** Layer folders that live directly in an area (`sparta/<area>/builders/`), shared by its groups, not in a group. */
+/**
+ * Layer folders that may also live outside a group: directly in an area (`sparta/<area>/builders/`), shared by its
+ * groups, and in `sparta/common/`, shared by everything. In a group or an area's `common/` they are ordinary layer
+ * folders.
+ */
 export const AREA_LAYER_FOLDERS: ReadonlySet<LayerFolder> = new Set(["builders", "directors"]);
 
-const AREAS: readonly Area[] = ["api", "database", "desktop", "mobile", "ui"];
+export const AREAS: readonly Area[] = ["api", "database", "desktop", "mobile", "ui"];
 
 /** Folders directly below the sparta folder that are not areas. */
 const TOP_LEVEL_FOLDERS = ["common", "fixtures", "scenarios", "support"];
@@ -89,6 +93,8 @@ export interface Conventions {
 		layer: RegExp;
 		/** `/<sparta>/<common|fixtures|scenarios|support>/`. */
 		top: RegExp;
+		/** `/<sparta>/common/<folder>`, capturing the folder. */
+		common: RegExp;
 		/** `/<sparta>/` or `/<tests>/`. */
 		checked: RegExp;
 		sparta: RegExp;
@@ -319,6 +325,7 @@ function buildPatterns(
 		area: new RegExp(`/${sparta}/(${areaNames})${end}(?:/([^/]+))?(?:/([^/]+))?`),
 		layer: new RegExp(`/${sparta}/(?:${areaNames})/[^/]+/([^/]+)/`),
 		top: new RegExp(`/${sparta}/(${TOP_LEVEL_FOLDERS.join("|")})${end}`),
+		common: new RegExp(`/${sparta}/common/([^/]+)${end}`),
 		checked: new RegExp(`/(?:${sparta}|${tests})/`),
 		sparta: new RegExp(`/${sparta}/`),
 		tests: new RegExp(`/${tests}${end}`),

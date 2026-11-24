@@ -26,7 +26,8 @@
 		"url": "git+https://github.com/CeriosTesting/sparta-lint-rules.git"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"oxlintrc.schema.json"
 	],
 	"type": "commonjs",
 	"sideEffects": false,
@@ -64,7 +65,8 @@
 				"types": "./dist/settings.d.cts",
 				"default": "./dist/settings.cjs"
 			}
-		}
+		},
+		"./oxlintrc.schema.json": "./oxlintrc.schema.json"
 	},
 	"scripts": {
 		"build": "tsdown",
@@ -90,6 +92,7 @@
 	"devDependencies": {
 		"@arethetypeswrong/cli": "^0.18.5",
 		"@changesets/cli": "^3.0.3",
+		"@eslint/core": "^1.2.1",
 		"@types/node": "^26.6.6",
 		"@typescript-eslint/parser": "^8.72.2",
 		"eslint": "^10.14.0",
@@ -104,10 +107,14 @@
 		"vitest": "^5.1.0"
 	},
 	"peerDependencies": {
+		"@eslint/core": "*",
 		"eslint": ">=9.0.0",
 		"oxlint": ">=1.91.0"
 	},
 	"peerDependenciesMeta": {
+		"@eslint/core": {
+			"optional": true
+		},
 		"eslint": {
 			"optional": true
 		},

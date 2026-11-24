@@ -8,9 +8,9 @@ Require a director to compose several builders; a director using a single builde
 
 ## Rule details
 
-A director (`sparta/<area>/directors/*-director.ts`) puts several builders together into one piece of test data. A director that only uses one builder adds nothing on top of it, so that code belongs on the builder as a custom builder method.
+A director (`directors/*-director.ts`, in a group, an area's `common/`, an area or `sparta/common/`) puts several builders together into one piece of test data. A director that only uses one builder adds nothing on top of it, so that code belongs on the builder as a custom builder method.
 
-The rule counts the builders a director imports, by name. A builder is any import that resolves into the area's `builders/` folder (relative paths, tsconfig `paths` and `baseUrl`, and the `@sparta/` alias plus configured aliases). Exactly one builder is reported.
+The rule counts the builders a director imports, by name. A builder is any import that resolves into a `builders/` folder (relative paths, tsconfig `paths` and `baseUrl`, and the `@sparta/` alias plus configured aliases). Exactly one builder is reported.
 
 - `import type` and `type` specifiers do not count, since they don't use the builder.
 - The same builder imported twice counts once.

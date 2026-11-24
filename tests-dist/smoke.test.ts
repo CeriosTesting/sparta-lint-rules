@@ -8,6 +8,7 @@ import { ESLint } from "eslint";
 const ROOT = path.resolve(__dirname, "..");
 const FIXTURE = path.join(__dirname, "fixture");
 const OXLINT_BIN = path.join(ROOT, "node_modules/oxlint/bin/oxlint");
+const TSC_BIN = path.join(ROOT, "node_modules/typescript/bin/tsc");
 
 const EXPECTED = [
 	"sparta/architecture-boundaries sparta/api/orders/steppers/orders-stepper.ts",
@@ -47,6 +48,17 @@ function runOxlint(...args: string[]): string[] {
 		.toSorted();
 }
 
+/** Runs tsc on a fixture tsconfig and returns its diagnostics, or "" when it passes. */
+function typecheck(tsconfig: string): string {
+	try {
+		execFileSync(process.execPath, [TSC_BIN, "-p", tsconfig], { cwd: FIXTURE, encoding: "utf8" });
+
+		return "";
+	} catch (error) {
+		return (error as { stdout: string }).stdout;
+	}
+}
+
 describe("built package", () => {
 	const fixtureRequire = createRequire(path.join(FIXTURE, "package.json"));
 
@@ -82,6 +94,18 @@ describe("built package", () => {
 				"sparta/architecture-boundaries sparta/web/shop/pages/cart-page.ts",
 			].toSorted()
 		);
+	});
+
+	// tsc also fails on an unused `@ts-expect-error`, so the wrong values in the typed configs must be caught.
+	it("types the sparta rules and settings.sparta in oxlint configs", () => {
+		expect(typecheck("tsconfig.typecheck.json")).toBe("");
+	});
+
+	// ESLint 9 types `settings` as a plain record; ESLint 10 (`@eslint/core` 1) made it augmentable.
+	const eslintMajor = Number((fixtureRequire("eslint/package.json") as { version: string }).version.split(".")[0]);
+
+	it("types settings.sparta in ESLint configs", { skip: eslintMajor < 10 }, () => {
+		expect(typecheck("tsconfig.typecheck.eslint.json")).toBe("");
 	});
 
 	it("reports through ESLint with the recommended flat config", async () => {
