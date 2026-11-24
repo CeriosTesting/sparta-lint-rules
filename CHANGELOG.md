@@ -1,5 +1,27 @@
 # @cerios/sparta-lint-rules
 
+## 0.1.0
+
+### Minor Changes
+
+- f05b3b0: Autocompletion in lint configs. Your editor now suggests the sparta rules and the `settings.sparta` keys and values, and flags wrong values:
+  
+  - `oxlint.config.ts`: rule names and `settings.sparta`, once you import `@cerios/sparta-lint-rules/oxlint` and use oxlint's `defineConfig`. `satisfies SpartaSettings` is no longer needed.
+  - `.oxlintrc.json`: rule names and `settings.sparta`, with `"$schema": "./node_modules/@cerios/sparta-lint-rules/oxlintrc.schema.json"`. The schema extends oxlint's own, so oxlint's options keep their completion.
+  - ESLint flat config (ESLint 10+): `settings.sparta`, once you import the plugin and use `defineConfig` from `eslint/config`. ESLint 9 types `settings` as a plain record, so keep `satisfies SpartaSettings` there.
+
+### Patch Changes
+
+- f05b3b0: `architecture-boundaries`: builders and directors are no longer limited to `sparta/<area>/builders/` and `sparta/<area>/directors/`. Put them at the level that matches who needs them:
+  
+  - in a group (`sparta/<area>/<group>/builders/`), private to that group, using its own services and models;
+  - in an area's `common/` (`sparta/<area>/common/builders/`), for everything in that area folder;
+  - directly in an area (`sparta/<area>/builders/`), shared by the area's groups, as before;
+  - in `sparta/common/` (`sparta/common/builders/`), for every area.
+  
+  The `placement` error for `builders/` and `directors/` folders inside a group is removed. The same rules apply at every level: only scenarios, steppers, asserters, services and directors may use builders; builders use no builders or directors; directors use no directors; besides builders, a builder or director may only use services (as a normal class) and code outside the layer folders. `director-composes-builders`, `file-naming` and `class-matches-filename` cover the new locations.
+- f05b3b0: Fix the types of ESM imports. The ESM type declarations used `export =`, so `import sparta from "@cerios/sparta-lint-rules/oxlint"` in an `oxlint.config.ts` (or the plugin in a typed ESLint config) failed with "has no default export". `sparta.configs.recommended` is now also accepted by ESLint's `defineConfig` in TypeScript.
+
 ## 0.0.2
 
 ### Patch Changes
