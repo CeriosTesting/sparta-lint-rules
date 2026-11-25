@@ -20,3 +20,28 @@ export const isStepDecorator = (decorator: NodeOfType<"Decorator">, names: Reado
 
 	return callee.type === "Identifier" && names.has(callee.name);
 };
+
+/** Whether `value` is an AST node. */
+export const isNode = (value: unknown): value is AstNode =>
+	typeof value === "object" && value !== null && typeof (value as { type?: unknown }).type === "string";
+
+const NON_CHILD_KEYS = new Set(["parent", "loc", "range", "start", "end"]);
+
+/** Whether `node` or any node below it, type annotations included, matches `predicate`. */
+export function someDescendant(node: AstNode, predicate: (node: AstNode) => boolean): boolean {
+	if (predicate(node)) return true;
+
+	for (const [key, value] of Object.entries(node)) {
+		if (NON_CHILD_KEYS.has(key)) continue;
+
+		const children: unknown[] = Array.isArray(value) ? value : [value];
+
+		if (children.some(child => isNode(child) && someDescendant(child, predicate))) return true;
+	}
+
+	return false;
+}
+
+/** The name a specifier imports: `a` in `import { a as b }` and in `import { "a" as b }`. */
+export const importedName = (specifier: NodeOfType<"ImportSpecifier">): string =>
+	specifier.imported.type === "Identifier" ? specifier.imported.name : String(specifier.imported.value);

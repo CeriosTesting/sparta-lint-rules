@@ -60,7 +60,7 @@ Builders (`*-builder.ts`) and directors (`*-director.ts`) build test data. Put t
 This applies to every area: `api`, `database`, `ui`, `mobile`, `desktop` and custom areas. Sub-folders are fine (`sparta/api/salesforce/builders/brp/case-builder.ts`).
 
 - **Who may use them:** only scenarios, steppers, asserters and services (and directors, see below) that can see them. Every other file is reported, including clients, repositories, pages, screens, windows, components, base layers and files outside the layer folders, such as `models/` or `sparta/common/helpers.ts`. Builders out of sight are an isolation error: another group's, another area's, and, for code in an area's `common/` or `sparta/common/`, the area-level ones. Fixtures, top-level scenarios and tests may use them.
-- **Builders** do not depend on other builders or on directors.
+- **Builders** do not depend on directors, and only use another builder they can see for nested composition with [`@cerios/cerios-builder`](https://www.npmjs.com/package/@cerios/cerios-builder): every use of the imported builder must be inside a composer type for it (`BuilderComposerFromFactory<typeof AddressBuilder.create>` for types and interfaces, `ClassBuilderComposerFromFactory<…>` for classes), or inside a function or method with a parameter of such a type. The composer type may be written on the parameter or reached through a local `type` alias or `interface`. Any other use of the builder is reported where it happens. A namespace import (`import * as`), dynamic import, `require` or re-export of another builder is always reported.
 - **Directors** only depend on builders they can see, never on other directors. A group's director may combine its group's builders with those of its area's `common/`, its area and `sparta/common/`. A director that uses a single builder belongs on that builder as a custom method; [`director-composes-builders`](director-composes-builders.md) reports that.
 - **Other dependencies:** besides builders, a builder or director may only use services and code outside the layer folders (models, helpers, packages) that it can see. Clients, steppers, pages, base layers and other layers are reported.
 - **Services:** a builder or director is either a static abstract class (`abstract`, with only `static` members and at most a `private constructor`) or a normal class. Only a normal class may use services. A static abstract class, or a file without a class, that imports a service is reported.
@@ -106,11 +106,34 @@ import { OrdersClient } from "@sparta/api/orders/clients/orders-client";
 // ✅ a normal class may use a service of its area
 import { OrdersService } from "@sparta/api/orders/services/orders-service";
 
-// ❌ builders don't use other builders
+// ❌ builders don't use other builders (outside a composer, see below)
 import { AddressBuilder } from "./address-builder";
 
 export class OrderBuilder {
 	constructor(private readonly orders: OrdersService) {}
+}
+```
+
+```ts
+// sparta/api/builders/customer-builder.ts
+
+import { BuilderComposerFromFactory, BuilderWith, CeriosAutoBuilder } from "@cerios/cerios-builder";
+import { Customer } from "@sparta/api/common/models/customer";
+
+import { AddressBuilder } from "./address-builder";
+
+export class CustomerBuilder extends CeriosAutoBuilder<Customer>() {
+	// ✅ the caller composes the nested address; AddressBuilder is only used for that
+	withAddress(
+		fn: BuilderComposerFromFactory<typeof AddressBuilder.createWithDefaults>
+	): BuilderWith<this, "address", CustomerBuilder> {
+		return this.address(fn(AddressBuilder.createWithDefaults()).build());
+	}
+
+	// ❌ AddressBuilder used outside a composer: put this recipe in a director
+	withDefaultAddress(): BuilderWith<this, "address", CustomerBuilder> {
+		return this.address(AddressBuilder.createWithDefaults().build());
+	}
 }
 ```
 
@@ -131,7 +154,7 @@ export abstract class OrderDirector {
 // ✅ packages, the group's own models and (in a normal class) its own services
 import { CeriosAutoBuilder } from "@cerios/cerios-builder";
 import { Document } from "@sparta/api/salesforce/models/document";
-// ❌ builders don't use other builders, at any level
+// ❌ builders don't use other builders outside a composer, at any level
 import { PersonBuilder } from "@sparta/common/builders/person-builder";
 
 // ❌ only services: no clients, steppers, ...

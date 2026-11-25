@@ -41,6 +41,23 @@ const lazy = await import("../builders/customer-builder");`,
 			filename: DIRECTOR,
 		},
 		{
+			name: "a single builder plus another director is left to architecture-boundaries",
+			code: `import { OrderBuilder } from "../builders/order-builder";
+import { InvoiceDirector } from "./invoice-director";`,
+			filename: DIRECTOR,
+		},
+		{
+			name: "a single builder plus a type-only or dynamic director import",
+			code: `import { OrderBuilder } from "../builders/order-builder";
+import type { InvoiceDirector } from "./invoice-director";`,
+			filename: DIRECTOR,
+		},
+		{
+			code: `import { OrderBuilder } from "../builders/order-builder";
+const { InvoiceDirector } = await import("./invoice-director");`,
+			filename: DIRECTOR,
+		},
+		{
 			name: "a director without builders is not reported here",
 			code: `import { Order } from "@sparta/api/common/models/order";`,
 			filename: DIRECTOR,

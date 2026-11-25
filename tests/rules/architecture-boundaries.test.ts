@@ -30,6 +30,186 @@ const PERSON_DIRECTOR = file("sparta/common/directors/person-director.ts");
 const COMMON_BUILDER = `import { PersonBuilder } from "@sparta/common/builders/person-builder";`;
 const AREA_COMMON_BUILDER = `import { AddressBuilder } from "@sparta/api/common/builders/address-builder";`;
 
+const CUSTOMER_BUILDER = file("sparta/api/builders/customer-builder.ts");
+const ADDRESS_IMPORT = `import { AddressBuilder } from "./address-builder";`;
+const COMPOSER_IMPORT = `import { BuilderComposerFromFactory, BuilderWith, CeriosAutoBuilder } from "@cerios/cerios-builder";`;
+
+/** A builder that uses another builder only for nested composition, as `@cerios/cerios-builder` documents it. */
+const COMPOSER_USES = [
+	{
+		name: "composers: a builder uses another builder through BuilderComposerFromFactory",
+		code: `${COMPOSER_IMPORT}
+${ADDRESS_IMPORT}
+export class CustomerBuilder extends CeriosAutoBuilder<Customer>() {
+	withAddress(
+		fn: BuilderComposerFromFactory<typeof AddressBuilder.createWithDefaults>,
+	): BuilderWith<this, "address", CustomerBuilder> {
+		return this.address(fn(AddressBuilder.createWithDefaults()).build());
+	}
+
+	withCompleteAddress(fn?: BuilderComposerFromFactory<typeof AddressBuilder.createComplete>) {
+		const builder = AddressBuilder.createComplete();
+		return this.address(fn ? fn(builder).build() : builder.build());
+	}
+}`,
+	},
+	{
+		name: "composers: ClassBuilderComposerFromFactory for class targets",
+		code: `import { ClassBuilderComposerFromFactory, CeriosClassAutoBuilder } from "@cerios/cerios-builder";
+import AddressBuilder from "./address-builder";
+export class CustomerBuilder extends CeriosClassAutoBuilder(Customer) {
+	withAddress(fn: ClassBuilderComposerFromFactory<typeof AddressBuilder.create>) {
+		return this.address(fn(AddressBuilder.create()).build());
+	}
+}`,
+	},
+	{
+		name: "composers: a renamed composer type, an arrow function property and two builders",
+		code: `import type { BuilderComposerFromFactory as Compose } from "@cerios/cerios-builder";
+import { AddressBuilder } from "./address-builder";
+import { ContactBuilder } from "@sparta/common/builders/contact-builder";
+export class CustomerBuilder {
+	withAddress = (fn: Compose<typeof AddressBuilder.create>) => this.address(fn(AddressBuilder.create()).build());
+	withContact(fn: Compose<typeof ContactBuilder.create>) {
+		return this.contact(fn(ContactBuilder.create()).build());
+	}
+}`,
+	},
+	{
+		name: "composers: a namespace import of the composer type",
+		code: `import * as cerios from "@cerios/cerios-builder";
+${ADDRESS_IMPORT}
+export class CustomerBuilder {
+	withAddress(fn: cerios.BuilderComposerFromFactory<typeof AddressBuilder.presets.domestic>) {
+		return this.address(fn(AddressBuilder.presets.domestic()).build());
+	}
+}`,
+	},
+	{
+		name: "composers: through a local type alias, an alias of it and an interface",
+		code: `${COMPOSER_IMPORT}
+${ADDRESS_IMPORT}
+type AddressFn = BuilderComposerFromFactory<typeof AddressBuilder.create>;
+export type OptionalAddressFn = AddressFn | undefined;
+interface CustomerOptions {
+	address?: BuilderComposerFromFactory<typeof AddressBuilder.createWithDefaults>;
+}
+export class CustomerBuilder {
+	withAddress(fn: AddressFn) {
+		return this.address(fn(AddressBuilder.create()).build());
+	}
+	withOptionalAddress(fn: OptionalAddressFn) {
+		return fn ? this.address(fn(AddressBuilder.create()).build()) : this;
+	}
+	withOptions({ address }: CustomerOptions) {
+		return address ? this.address(address(AddressBuilder.createWithDefaults()).build()) : this;
+	}
+}`,
+	},
+	{
+		name: "composers: a type-only import used in a composer signature",
+		code: `${COMPOSER_IMPORT}
+import type { AddressBuilder } from "./address-builder";
+export abstract class CustomerBuilder {
+	abstract withAddress(fn: BuilderComposerFromFactory<typeof AddressBuilder.create>): this;
+}`,
+	},
+	{
+		name: "composers: a group builder composes a sparta/common builder",
+		code: `${COMPOSER_IMPORT}
+${COMMON_BUILDER}
+export class DocumentBuilder {
+	withOwner(fn: BuilderComposerFromFactory<typeof PersonBuilder.create>) {
+		return this.owner(fn(PersonBuilder.create()).build());
+	}
+}`,
+		filename: DOCUMENT_BUILDER,
+	},
+].map(testCase => ({ filename: CUSTOMER_BUILDER, ...testCase }));
+
+/** A builder that uses another builder outside a composer, or with a composer that is not for that builder. */
+const COMPOSER_MISUSES = [
+	{
+		name: "composers: a builder also uses the builder outside the composer",
+		code: `${COMPOSER_IMPORT}
+${ADDRESS_IMPORT}
+export class CustomerBuilder {
+	static create() {
+		return new CustomerBuilder({ address: AddressBuilder.create().build() });
+	}
+	withAddress(fn: BuilderComposerFromFactory<typeof AddressBuilder.create>) {
+		return this.address(fn(AddressBuilder.create()).build());
+	}
+}`,
+		errors: [{ messageId: "builderUsesBuilder", data: { dependency: "'AddressBuilder' from './address-builder'" } }],
+	},
+	{
+		name: "composers: the composer is for another builder",
+		code: `${COMPOSER_IMPORT}
+import { AddressBuilder, ContactBuilder } from "../builders";
+export class CustomerBuilder {
+	withAddress(fn: BuilderComposerFromFactory<typeof ContactBuilder.create>) {
+		return this.address(fn(AddressBuilder.create()).build());
+	}
+}`,
+		errors: [{ messageId: "builderUsesBuilder", data: { dependency: "'AddressBuilder' from '../builders'" } }],
+	},
+	{
+		name: "composers: a composer type from another package",
+		code: `import type { BuilderComposerFromFactory } from "some-builder-lib";
+${ADDRESS_IMPORT}
+export class CustomerBuilder {
+	withAddress(fn: BuilderComposerFromFactory<typeof AddressBuilder.create>) {
+		return this.address(fn(AddressBuilder.create()).build());
+	}
+}`,
+		errors: [{ messageId: "builderUsesBuilder" }],
+	},
+	{
+		name: "composers: the deprecated BuilderComposer type is not a composer",
+		code: `import type { BuilderComposer } from "@cerios/cerios-builder";
+${ADDRESS_IMPORT}
+export class CustomerBuilder {
+	withAddress(fn: BuilderComposer<typeof AddressBuilder, Address>) {
+		return this.address(fn(AddressBuilder.create()).build());
+	}
+}`,
+		errors: [{ messageId: "builderUsesBuilder" }],
+	},
+	{
+		name: "composers: a namespace import of a builder can't be followed",
+		code: `${COMPOSER_IMPORT}
+import * as address from "./address-builder";
+export class CustomerBuilder {
+	withAddress(fn: BuilderComposerFromFactory<typeof address.AddressBuilder.create>) {
+		return this.address(fn(address.AddressBuilder.create()).build());
+	}
+}`,
+		errors: [{ messageId: "builderUsesBuilder", data: { dependency: "'* as address' from './address-builder'" } }],
+	},
+	{
+		name: "composers: a builder re-exports another builder",
+		code: `export { AddressBuilder } from "./address-builder";
+export * from "./contact-builder";`,
+		errors: [
+			{ messageId: "builderUsesBuilder", data: { dependency: "'AddressBuilder' from './address-builder'" } },
+			{ messageId: "builderUsesBuilder", data: { dependency: "'./contact-builder'" } },
+		],
+	},
+	{
+		name: "composers: a composer does not lift group isolation",
+		code: `${COMPOSER_IMPORT}
+import { DocumentBuilder } from "@sparta/api/salesforce/builders/document-builder";
+export class TicketBuilder {
+	withDocument(fn: BuilderComposerFromFactory<typeof DocumentBuilder.create>) {
+		return this.document(fn(DocumentBuilder.create()).build());
+	}
+}`,
+		filename: file("sparta/api/orders/builders/ticket-builder.ts"),
+		errors: [{ messageId: "isolation" }],
+	},
+].map(testCase => ({ filename: CUSTOMER_BUILDER, ...testCase }));
+
 const CUSTOM = {
 	sparta: { areas: { web: "ui" }, layers: { "page-objects": "pages" }, aliases: { "@app/*": "sparta" } },
 } as const;
@@ -111,6 +291,7 @@ import { test } from "@playwright/test";`,
 import { CustomerBuilder } from "../builders/customer-builder";`,
 			filename: ORDER_DIRECTOR,
 		},
+		...COMPOSER_USES,
 		{
 			name: "builders: a builder uses area common code and support",
 			code: `import { Order } from "@sparta/api/common/models/order";
@@ -601,25 +782,37 @@ const lazy = import("../clients/orders-client");`,
 			name: "builders: a builder uses another builder",
 			code: `import { AddressBuilder } from "./address-builder";`,
 			filename: ORDER_BUILDER,
-			errors: [
-				{
-					messageId: "layer",
-					data: { source: "api builder", target: "api builder", request: "./address-builder" },
-				},
-			],
+			errors: [{ messageId: "builderUsesBuilder", data: { dependency: "'AddressBuilder' from './address-builder'" } }],
 		},
 		{
 			name: "builders: a builder uses a director",
 			code: `import { OrderDirector } from "../directors/order-director";`,
 			filename: ORDER_BUILDER,
-			errors: [{ messageId: "layer" }],
+			errors: [
+				{
+					messageId: "builderUsesDirector",
+					data: { dependency: "'OrderDirector' from '../directors/order-director'" },
+				},
+			],
 		},
 		{
 			name: "builders: a director uses another director",
 			code: `import { CustomerDirector } from "./customer-director";`,
 			filename: ORDER_DIRECTOR,
-			errors: [{ messageId: "layer" }],
+			errors: [
+				{
+					messageId: "directorUsesDirector",
+					data: { dependency: "'CustomerDirector' from './customer-director'" },
+				},
+			],
 		},
+		{
+			name: "builders: a director uses another director through a dynamic import",
+			code: `const { CustomerDirector } = await import("./customer-director");`,
+			filename: ORDER_DIRECTOR,
+			errors: [{ messageId: "directorUsesDirector", data: { dependency: "'./customer-director'" } }],
+		},
+		...COMPOSER_MISUSES,
 		{
 			name: "builders: a director uses another area's builder",
 			code: `import { CartBuilder } from "@sparta/ui/builders/cart-builder";`,
@@ -751,20 +944,20 @@ export class DocumentBuilder {}`,
 			name: "group builders: a builder uses another builder",
 			code: `import { AccountBuilder } from "./account-builder";`,
 			filename: DOCUMENT_BUILDER,
-			errors: [{ messageId: "layer" }],
+			errors: [{ messageId: "builderUsesBuilder" }],
 		},
 		{
 			name: "group builders: a builder uses the area's builder",
 			code: API_BUILDER,
 			filename: DOCUMENT_BUILDER,
-			errors: [{ messageId: "layer" }],
+			errors: [{ messageId: "builderUsesBuilder" }],
 		},
 		{
 			name: "group builders: a director uses a director",
 			code: `import { AccountDirector } from "./account-director";
 import { OrderDirector } from "@sparta/api/directors/order-director";`,
 			filename: DOCUMENT_DIRECTOR,
-			errors: [{ messageId: "layer" }, { messageId: "layer" }],
+			errors: [{ messageId: "directorUsesDirector" }, { messageId: "directorUsesDirector" }],
 		},
 		{
 			name: "group builders: a page or a file outside the layer folders uses them",
@@ -829,12 +1022,7 @@ export class PersonBuilder {}`,
 			name: "common builders: a builder uses another builder",
 			code: `import { AddressBuilder } from "./address-builder";`,
 			filename: PERSON_BUILDER,
-			errors: [
-				{
-					messageId: "layer",
-					data: { source: "sparta/common builder", target: "sparta/common builder", request: "./address-builder" },
-				},
-			],
+			errors: [{ messageId: "builderUsesBuilder", data: { dependency: "'AddressBuilder' from './address-builder'" } }],
 		},
 		{
 			name: "common builders: shared code outside the builder folders uses them",

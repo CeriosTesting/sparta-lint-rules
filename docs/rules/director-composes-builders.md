@@ -17,7 +17,7 @@ The rule counts the builders a director imports, by name. A builder is any impor
 - A namespace import (`import * as builders`), dynamic `import()` or `require()` of a builder doesn't tell how many builders are used, so the file is not reported.
 - An `index.ts` barrel in `directors/` is not a director.
 
-Directors may not use other directors at all; [`architecture-boundaries`](architecture-boundaries.md#builders-and-directors) reports that.
+Directors may not use other directors at all; [`architecture-boundaries`](architecture-boundaries.md#builders-and-directors) reports that. A director that also imports another director is therefore not reported here: moving its code onto the single builder would make that builder use a director. Use the builders behind the other director directly instead.
 
 ## Settings
 
