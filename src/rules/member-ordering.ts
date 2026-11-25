@@ -1,3 +1,4 @@
+import { isNode } from "../utils/ast";
 import { type ClassMember, isMethod, isPlainProperty, isPrivate, memberName } from "../utils/class-members";
 import { docsUrl } from "../utils/docs";
 import type { AstNode, Rule } from "../utils/types";
@@ -48,9 +49,6 @@ const groupOf = (member: ClassMember): Group | undefined => {
 };
 
 const SKIPPED_KEYS = new Set(["parent", "loc", "range", "start", "end", "typeAnnotation"]);
-
-const isNode = (value: unknown): value is AstNode =>
-	typeof value === "object" && value !== null && typeof (value as { type?: unknown }).type === "string";
 
 const FUNCTIONS = new Set(["ArrowFunctionExpression", "FunctionExpression", "ClassExpression"]);
 

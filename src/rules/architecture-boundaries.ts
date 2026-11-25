@@ -1,11 +1,12 @@
-import { staticString, stringValue } from "../utils/ast";
+import { importedName, staticString, stringValue } from "../utils/ast";
+import { collectComposerNames, composerUseCheck, createComposerNames } from "../utils/builder-composers";
 import { isStaticClass, topLevelClasses } from "../utils/class-members";
 import type { Conventions } from "../utils/conventions";
 import { docsUrl } from "../utils/docs";
 import { conventionsFor, rootFor } from "../utils/settings";
 import { classify, moduleName, resolveImport } from "../utils/sparta-paths";
 import type { Area, FileInfo, Kind } from "../utils/sparta-paths";
-import type { AstNode, Rule } from "../utils/types";
+import type { AstNode, NodeOfType, Rule } from "../utils/types";
 
 type OrchestrationKind = Extract<Kind, "top-scenario" | "test">;
 
@@ -151,13 +152,28 @@ function isolationViolation(source: FileInfo, target: FileInfo): boolean {
 	return source.kind === "group" || source.kind === "area-layer" ? areaIsolationViolation(source, target) : false;
 }
 
+type BuilderMessageId = "builderUsesBuilder" | "builderUsesDirector" | "directorUsesDirector";
+
 /**
- * Whether `source` may not use the builder or director `target`: builders use no builders or directors, directors
- * only use builders, and otherwise only scenarios, steppers, asserters and services may use them. Fixtures,
- * top-level scenarios and tests are left to the other checks. Which builders a file can see is up to isolation.
+ * The message for a builder or director using a builder or director it may not use, wherever both live: builders
+ * use no builders (outside a composer, see `composerUseCheck`) and no directors, directors use no directors.
  */
-function builderViolation(source: FileInfo, target: FileInfo): boolean | undefined {
-	if (isBuilderLayer(source)) return source.layer === "builder" || target.layer === "director";
+function builderMessageId(source: FileInfo, target: FileInfo): BuilderMessageId | undefined {
+	if (source.layer === "builder") {
+		if (target.layer === "builder") return "builderUsesBuilder";
+		if (target.layer === "director") return "builderUsesDirector";
+	}
+
+	return source.layer === "director" && target.layer === "director" ? "directorUsesDirector" : undefined;
+}
+
+/**
+ * Whether `source` may not use the builder or director `target`: only scenarios, steppers, asserters and services
+ * (and directors, which `builderMessageId` checks) may use them. Fixtures, top-level scenarios and tests are left to
+ * the other checks. Which builders a file can see is up to isolation.
+ */
+function builderViolation(source: FileInfo): boolean | undefined {
+	if (isBuilderLayer(source)) return false;
 	if (["group", "area-common", "shared"].includes(source.kind)) {
 		return source.layer === undefined || !BUILDER_USERS.has(source.layer);
 	}
@@ -168,7 +184,7 @@ function builderViolation(source: FileInfo, target: FileInfo): boolean | undefin
 function layerViolation(source: FileInfo, target: FileInfo): boolean {
 	if (!target.layer) return false;
 
-	const builder = BUILDER_LAYERS.has(target.layer) ? builderViolation(source, target) : undefined;
+	const builder = BUILDER_LAYERS.has(target.layer) ? builderViolation(source) : undefined;
 
 	if (builder !== undefined) return builder;
 
@@ -192,6 +208,29 @@ function layerViolation(source: FileInfo, target: FileInfo): boolean {
 	return false;
 }
 
+/** `import X from …` or `import { X } from …`: an import whose every use can be followed. */
+const isBindingImport = (node: AstNode): node is NodeOfType<"ImportDeclaration"> =>
+	node.type === "ImportDeclaration" &&
+	node.specifiers.length > 0 &&
+	node.specifiers.every(specifier => specifier.type !== "ImportNamespaceSpecifier");
+
+/** `'InvoiceBuilder' from '…/invoice-builder'`, or only the quoted request when the import names nothing. */
+function dependency(node: AstNode, request: string): string {
+	let names: string[] = [];
+
+	if (node.type === "ImportDeclaration") {
+		names = node.specifiers.map(specifier => {
+			if (specifier.type === "ImportSpecifier") return importedName(specifier);
+
+			return specifier.type === "ImportNamespaceSpecifier" ? `* as ${specifier.local.name}` : specifier.local.name;
+		});
+	} else if (node.type === "ExportNamedDeclaration") {
+		names = node.specifiers.map(({ local }) => (local.type === "Identifier" ? local.name : String(local.value)));
+	}
+
+	return names.length === 0 ? `'${request}'` : `${names.map(name => `'${name}'`).join(", ")} from '${request}'`;
+}
+
 const isForbiddenReexport = (source: FileInfo, target: FileInfo): boolean =>
 	target.layer !== undefined &&
 	REEXPORT_LAYERS.has(target.layer) &&
@@ -210,6 +249,12 @@ const rule: Rule = {
 			isolation:
 				"{{source}} must not depend on {{target}} ({{request}}). Move shared code to the area's common/ folder or the top-level common/ folder.",
 			layer: "{{source}} must not depend on {{target}} ({{request}}).",
+			builderUsesBuilder:
+				"A builder must not use another builder ({{dependency}}). Builders build one object: compose builders in a director, or use the builder only in a method that takes a BuilderComposerFromFactory or ClassBuilderComposerFromFactory callback for it.",
+			builderUsesDirector:
+				"A builder must not use a director ({{dependency}}). Directors compose builders, not the other way round.",
+			directorUsesDirector:
+				"A director must not use another director ({{dependency}}). Use the builders directly, so each director is one flat recipe.",
 			reexport: "Do not re-export {{target}} outside its layer; this bypasses the architecture boundaries.",
 			staticService:
 				"{{source}} is a static abstract class and must not depend on {{target}} ({{request}}); only a normal class may use services.",
@@ -227,6 +272,11 @@ const rule: Rule = {
 		/** Whether the file declares a normal (instantiable) class. Set on `Program`, before any import is visited. */
 		let isNormalClass = false;
 
+		/** A builder's imports of other builders, checked against the composer types at the end of the file. */
+		const builderImports: { node: NodeOfType<"ImportDeclaration">; request: string }[] = [];
+		const composerNames = createComposerNames();
+		let program: NodeOfType<"Program"> | undefined;
+
 		/** An `index.ts` barrel in `builders/` or `directors/` may import and re-export its own layer. */
 		const isOwnBarrel = (target: FileInfo): boolean =>
 			isBuilderLayer(source) &&
@@ -235,6 +285,16 @@ const rule: Rule = {
 			target.areaFolder === source.areaFolder &&
 			target.group === source.group &&
 			target.layer === source.layer;
+
+		/** Reports a builder or director using one it may not. A builder importing a builder waits for `Program:exit`. */
+		const checkBuilderUse = (node: AstNode, request: string, messageId: BuilderMessageId): void => {
+			if (messageId === "builderUsesBuilder" && isBindingImport(node)) {
+				// Allowed when every use is for nested composition; known once the whole file is visited.
+				builderImports.push({ node, request });
+			} else {
+				context.report({ node, messageId, data: { dependency: dependency(node, request) } });
+			}
+		};
 
 		const check = (node: AstNode, request: string | undefined, reexport = false): void => {
 			if (request === undefined) return;
@@ -245,9 +305,12 @@ const rule: Rule = {
 			if (!target || isOwnBarrel(target)) return;
 
 			const data = { source: describe(source, conventions), target: describe(target, conventions), request };
+			const builderMessage = builderMessageId(source, target);
 
 			if (isolationViolation(source, target)) {
 				context.report({ node, messageId: "isolation", data });
+			} else if (builderMessage !== undefined) {
+				checkBuilderUse(node, request, builderMessage);
 			} else if (layerViolation(source, target)) {
 				context.report({ node, messageId: "layer", data });
 			} else if (isBuilderLayer(source) && target.layer === "service" && !isNormalClass) {
@@ -257,12 +320,38 @@ const rule: Rule = {
 			}
 		};
 
+		/** Reports each builder a builder imports at its first use outside a composer, or at the unused import. */
+		const checkBuilderImports = (): void => {
+			if (!program) return;
+
+			for (const { node, request } of builderImports) {
+				for (const variable of context.sourceCode.getDeclaredVariables(node)) {
+					const isComposerUse = composerUseCheck(program, composerNames, variable.name);
+					const misuse = variable.references.find(reference => !isComposerUse(reference.identifier));
+
+					if (misuse || variable.references.length === 0) {
+						context.report({
+							node: misuse?.identifier ?? node,
+							messageId: "builderUsesBuilder",
+							data: { dependency: `'${variable.name}' from '${request}'` },
+						});
+					}
+				}
+			}
+		};
+
 		return {
 			Program(node): void {
+				program = node;
 				isNormalClass = topLevelClasses(node).some(declaration => !isStaticClass(declaration));
 			},
 
-			ImportDeclaration: node => check(node, stringValue(node.source)),
+			"Program:exit": checkBuilderImports,
+
+			ImportDeclaration(node): void {
+				collectComposerNames(node, composerNames);
+				check(node, stringValue(node.source));
+			},
 
 			ExportNamedDeclaration: node => check(node, stringValue(node.source), true),
 

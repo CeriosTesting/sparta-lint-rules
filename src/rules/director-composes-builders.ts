@@ -1,4 +1,4 @@
-import { staticString } from "../utils/ast";
+import { importedName, staticString } from "../utils/ast";
 import { docsUrl } from "../utils/docs";
 import { conventionsFor, rootFor } from "../utils/settings";
 import { classify, moduleName, resolveImport } from "../utils/sparta-paths";
@@ -27,12 +27,13 @@ const rule: Rule = {
 
 		if (source?.layer !== "director" || moduleName(filename) === "index") return {};
 
-		const isBuilder = (request: string | undefined): boolean => {
-			if (request === undefined) return false;
+		/** The layer an import resolves to, if it resolves into a layer folder. */
+		const layerOf = (request: string | undefined): string | undefined => {
+			if (request === undefined) return undefined;
 
 			const resolved = resolveImport(filename, request, root, conventions);
 
-			return resolved !== undefined && classify(resolved, conventions, root)?.layer === "builder";
+			return resolved === undefined ? undefined : classify(resolved, conventions, root)?.layer;
 		};
 
 		/** The builders the director uses, by imported name, with the import to report. */
@@ -41,11 +42,26 @@ const rule: Rule = {
 		/** Set when a builder is imported in a way that does not tell how many builders are used. */
 		let unknown = false;
 
+		/**
+		 * Set when the director also uses another director. Moving its code onto the single builder would then make
+		 * that builder use a director, so the advice can't be followed; `architecture-boundaries` reports the import.
+		 */
+		let usesDirector = false;
+
+		/** Notes a dynamic import or `require`, which does not tell which builders or directors it uses. */
+		const dynamicImport = (request: string | undefined): void => {
+			const layer = layerOf(request);
+
+			if (layer === "builder") unknown = true;
+			if (layer === "director") usesDirector = true;
+		};
+
 		return {
 			ImportDeclaration(node): void {
-				if (node.importKind === "type" || typeof node.source.value !== "string" || !isBuilder(node.source.value)) {
-					return;
-				}
+				const layer = typeof node.source.value === "string" ? layerOf(node.source.value) : undefined;
+
+				if (layer === "director") usesDirector = true;
+				if (node.importKind === "type" || layer !== "builder") return;
 
 				for (const specifier of node.specifiers) {
 					if (specifier.type === "ImportNamespaceSpecifier") {
@@ -53,28 +69,25 @@ const rule: Rule = {
 					} else if (specifier.type === "ImportDefaultSpecifier") {
 						builders.set(specifier.local.name, { local: specifier.local.name, node });
 					} else if (specifier.importKind !== "type") {
-						const imported =
-							specifier.imported.type === "Identifier" ? specifier.imported.name : String(specifier.imported.value);
-
-						builders.set(imported, { local: specifier.local.name, node });
+						builders.set(importedName(specifier), { local: specifier.local.name, node });
 					}
 				}
 			},
 
 			ImportExpression(node): void {
-				if (isBuilder(staticString(node.source))) unknown = true;
+				dynamicImport(staticString(node.source));
 			},
 
 			CallExpression(node): void {
 				if (node.callee.type === "Identifier" && node.callee.name === "require") {
-					if (isBuilder(staticString(node.arguments[0]))) unknown = true;
+					dynamicImport(staticString(node.arguments[0]));
 				}
 			},
 
 			"Program:exit"(): void {
 				const [only] = builders.values();
 
-				if (unknown || builders.size !== 1 || only === undefined) return;
+				if (unknown || usesDirector || builders.size !== 1 || only === undefined) return;
 
 				context.report({ node: only.node, messageId: "singleBuilder", data: { builder: only.local } });
 			},
